@@ -21,7 +21,7 @@ export class SessionService {
     return {
       httpOnly: true,
       secure: this.config.get<string>('app.environment') === 'production',
-      sameSite: 'lax',
+      sameSite: this.config.get<'lax' | 'none'>('app.authCookieSameSite', 'lax'),
       path: '/',
       maxAge: days * 24 * 60 * 60 * 1000,
     };

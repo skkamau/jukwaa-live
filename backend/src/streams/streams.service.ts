@@ -226,10 +226,11 @@ export class StreamsService {
   }
 
   private async requireOwnedActiveStream(userId: string) {
+    const channel = await this.requireActiveOwnedChannel(userId);
     const stream = await this.prisma.stream.findFirst({
       where: {
         status: { in: ['PREPARING', 'LIVE'] },
-        channel: { creatorProfile: { userId } },
+        channelId: channel.id,
       },
       orderBy: { createdAt: 'desc' },
       select: publicStreamSelect,

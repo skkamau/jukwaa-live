@@ -78,6 +78,8 @@ STREAM_STATUS_SYNC_SECONDS=10
 ALLOW_MOCK_STREAMING_IN_PRODUCTION=false
 ```
 
+Public cross-site deployments configure `AUTH_COOKIE_SAME_SITE=none`; production always makes that cookie HttpOnly and Secure. Same-site custom-domain deployments should use `lax`. CORS accepts only `FRONTEND_ORIGIN` plus optional exact comma-separated `FRONTEND_ORIGINS`, and unsafe requests are rejected unless their `Origin` exactly matches that allow-list. Wildcards are never accepted. See [../DEPLOYMENT.md](../DEPLOYMENT.md).
+
 Only `mock` is accepted in Stage 5A. Production requires explicit mock opt-in, and simulation controls are still denied whenever `NODE_ENV=production`. Public responses omit provider stream IDs, credentials, emails, sessions, token data, and infrastructure secrets.
 
 For SMTP, set `EMAIL_DELIVERY_MODE=smtp` plus `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, and `MAIL_FROM`. Console delivery prints development-only verification/reset URLs and is rejected at startup in production.

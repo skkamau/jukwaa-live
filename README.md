@@ -33,6 +33,10 @@ npm run dev
 
 Open `http://localhost:5173`. Register, verify the development email link printed by the API, create a channel from `/dashboard`, then open `/go-live`.
 
+## Public deployment
+
+Stage 5A.5 prepares the repository for a Vercel frontend, Render NestJS API, and managed PostgreSQL database. It adds SPA route rewrites, production cookie/origin hardening, additive migration deployment guidance, and GitHub Actions CI. Follow [DEPLOYMENT.md](DEPLOYMENT.md) for the exact dashboard settings, environment variables, cookie strategy, migration order, SMTP requirements, and verification checklist.
+
 ## Stage 5A stream lifecycle
 
 The Go Live form calls `POST /api/v1/streams/me/prepare` and persists a `PREPARING` stream. A frontend click alone never marks a real stream live. The configured `StreamingProvider` reports provider state to a centralized synchronization and lifecycle layer, which performs:

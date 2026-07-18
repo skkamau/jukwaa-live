@@ -19,6 +19,7 @@ describe('SessionService', () => {
     get: jest.fn((key: string, fallback?: unknown) => ({
       'app.sessionDays': 30,
       'app.environment': 'test',
+      'app.authCookieSameSite': 'lax',
     })[key] ?? fallback),
   };
   const service = new SessionService(
@@ -69,5 +70,19 @@ describe('SessionService', () => {
   it('sets hardened cookie attributes', () => {
     expect(service.cookieOptions).toMatchObject({ httpOnly: true, secure: false, sameSite: 'lax', path: '/' });
     expect(service.cookieOptions.maxAge).toBe(30 * 24 * 60 * 60 * 1000);
+  });
+
+  it('supports an explicitly configured cross-site Secure production cookie', () => {
+    config.get.mockImplementation((key: string, fallback?: unknown) => ({
+      'app.sessionDays': 30,
+      'app.environment': 'production',
+      'app.authCookieSameSite': 'none',
+    })[key] ?? fallback);
+    expect(service.cookieOptions).toMatchObject({
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+      path: '/',
+    });
   });
 });

@@ -2,7 +2,7 @@ const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(
     /\/$/,
     "",
-  ) ?? "http://localhost:3000/api/v1";
+  ) ?? "/api/v1";
 
 export class ApiError extends Error {
   constructor(

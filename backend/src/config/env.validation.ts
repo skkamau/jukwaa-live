@@ -6,6 +6,7 @@ export interface EnvironmentVariables extends Record<string, unknown> {
   NODE_ENV: NodeEnvironment;
   PORT: number;
   FRONTEND_ORIGIN: string;
+  FRONTEND_ORIGINS?: string;
   DATABASE_URL: string;
   TRUST_PROXY: boolean;
   SESSION_TTL_DAYS: number;
@@ -13,6 +14,7 @@ export interface EnvironmentVariables extends Record<string, unknown> {
   STREAMING_PROVIDER: 'mock';
   STREAM_STATUS_SYNC_SECONDS: number;
   ALLOW_MOCK_STREAMING_IN_PRODUCTION: boolean;
+  AUTH_COOKIE_SAME_SITE: 'lax' | 'none';
 }
 
 const environmentSchema = Joi.object<EnvironmentVariables>({
@@ -23,6 +25,7 @@ const environmentSchema = Joi.object<EnvironmentVariables>({
   FRONTEND_ORIGIN: Joi.string()
     .uri({ scheme: ['http', 'https'] })
     .default('http://localhost:5173'),
+  FRONTEND_ORIGINS: Joi.string().optional(),
   DATABASE_URL: Joi.string()
     .uri({ scheme: ['postgresql', 'postgres'] })
     .required(),
@@ -32,6 +35,7 @@ const environmentSchema = Joi.object<EnvironmentVariables>({
   STREAMING_PROVIDER: Joi.string().valid('mock').default('mock'),
   STREAM_STATUS_SYNC_SECONDS: Joi.number().integer().min(2).max(300).default(10),
   ALLOW_MOCK_STREAMING_IN_PRODUCTION: Joi.boolean().default(false),
+  AUTH_COOKIE_SAME_SITE: Joi.string().valid('lax', 'none').default('lax'),
   SMTP_HOST: Joi.when('EMAIL_DELIVERY_MODE', { is: 'smtp', then: Joi.string().required(), otherwise: Joi.string().optional() }),
   SMTP_PORT: Joi.number().port().default(587),
   SMTP_SECURE: Joi.boolean().default(false),
@@ -61,6 +65,28 @@ export function validateEnvironment(
     );
   }
 
+  const frontendOrigins = parseFrontendOrigins(
+    value.FRONTEND_ORIGIN,
+    value.FRONTEND_ORIGINS,
+  );
+  if (
+    value.NODE_ENV === 'production' &&
+    frontendOrigins.some((origin) => !origin.startsWith('https://'))
+  ) {
+    throw new Error(
+      'Environment validation failed: production frontend origins must use HTTPS',
+    );
+  }
+
+  if (
+    value.AUTH_COOKIE_SAME_SITE === 'none' &&
+    value.NODE_ENV !== 'production'
+  ) {
+    throw new Error(
+      'Environment validation failed: AUTH_COOKIE_SAME_SITE=none requires a production Secure cookie',
+    );
+  }
+
   if (value.NODE_ENV === 'production' && value.EMAIL_DELIVERY_MODE === 'console') {
     throw new Error('Environment validation failed: EMAIL_DELIVERY_MODE=console is not allowed in production');
   }
@@ -86,4 +112,43 @@ export function validateEnvironment(
   }
 
   return value;
+}
+
+export function parseFrontendOrigins(
+  primaryOrigin: string,
+  additionalOrigins?: string,
+): string[] {
+  const candidates = [
+    primaryOrigin,
+    ...(additionalOrigins?.split(',') ?? []),
+  ].map((origin) => origin.trim()).filter(Boolean);
+  const normalized = candidates.map((origin) => {
+    if (origin.includes('*')) {
+      throw new Error(
+        'Environment validation failed: frontend origins cannot contain wildcards',
+      );
+    }
+    let parsed: URL;
+    try {
+      parsed = new URL(origin);
+    } catch {
+      throw new Error(
+        `Environment validation failed: invalid frontend origin ${origin}`,
+      );
+    }
+    if (
+      !['http:', 'https:'].includes(parsed.protocol) ||
+      parsed.username ||
+      parsed.password ||
+      (parsed.pathname !== '/' && parsed.pathname !== '') ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      throw new Error(
+        `Environment validation failed: frontend origin must be an HTTP(S) origin without a path: ${origin}`,
+      );
+    }
+    return parsed.origin;
+  });
+  return [...new Set(normalized)];
 }

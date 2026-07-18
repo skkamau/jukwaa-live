@@ -66,4 +66,24 @@ describe('GET /api/v1/health', () => {
     expect(JSON.stringify(response.body)).not.toContain('postgresql://');
     expect(JSON.stringify(response.body)).not.toContain('db.internal');
   });
+
+  it('rejects unsafe requests without an explicitly trusted Origin', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ identifier: 'user', password: 'not-used' })
+      .expect(403);
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .set('Origin', 'https://attacker.example')
+      .send({ identifier: 'user', password: 'not-used' })
+      .expect(403);
+  });
+
+  it('allows a trusted Origin to reach normal request validation', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .set('Origin', 'http://localhost:5173')
+      .send({})
+      .expect(400);
+  });
 });

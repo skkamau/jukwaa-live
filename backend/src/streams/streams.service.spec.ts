@@ -94,8 +94,38 @@ describe('StreamsService', () => {
     prisma.stream.update.mockResolvedValue({ ...baseStream, title: 'Updated title' });
     await service.updateCurrent('user-1', { title: 'Updated title' });
     expect(prisma.stream.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ channel: { creatorProfile: { userId: 'user-1' } } }),
+      where: expect.objectContaining({ channelId: 'channel-1' }),
     }));
+  });
+
+  it.each([
+    ['SUSPENDED', 'ACTIVE'],
+    ['ACTIVE', 'SUSPENDED'],
+    ['ACTIVE', 'ARCHIVED'],
+  ])('blocks stream mutation when creator is %s and channel is %s', async (creatorStatus, channelStatus) => {
+    prisma.channel.findFirst.mockResolvedValue({
+      id: 'channel-1',
+      status: channelStatus,
+      creatorProfile: { status: creatorStatus },
+    });
+    await expect(service.updateCurrent('user-1', { title: 'Forbidden update' }))
+      .rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.stream.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['update metadata', () => service.updateCurrent('user-1', { title: 'Blocked' })],
+    ['cancel', () => service.cancelCurrent('user-1')],
+    ['simulate live', () => service.simulateLive('user-1')],
+    ['simulate end', () => service.simulateEnd('user-1')],
+  ])('re-checks active creator/channel status before %s', async (_label, mutate) => {
+    prisma.channel.findFirst.mockResolvedValue({
+      id: 'channel-1', status: 'ACTIVE', creatorProfile: { status: 'SUSPENDED' },
+    });
+    await expect(mutate()).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.stream.update).not.toHaveBeenCalled();
+    expect(lifecycle.cancelPreparing).not.toHaveBeenCalled();
+    expect(sync.synchronize).not.toHaveBeenCalled();
   });
 
   it('cancels only an owned PREPARING stream', async () => {

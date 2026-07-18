@@ -4,6 +4,9 @@
   "private": true,
   "description": "Backend API foundation for Jukwaa Live",
   "license": "UNLICENSED",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"prisma/**/*.ts\" \"prisma.config.ts\"",

@@ -4,10 +4,11 @@ import { json, urlencoded } from 'express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { createOriginValidationMiddleware } from './common/middleware/origin-validation.middleware';
 
 export function configureApplication(app: INestApplication): void {
   const configService = app.get(ConfigService);
-  const frontendOrigin = configService.getOrThrow<string>('app.frontendOrigin');
+  const frontendOrigins = configService.getOrThrow<string[]>('app.frontendOrigins');
 
   if (configService.get<boolean>('app.trustProxy', false)) {
     app.getHttpAdapter().getInstance().set('trust proxy', 1);
@@ -15,11 +16,12 @@ export function configureApplication(app: INestApplication): void {
 
   app.setGlobalPrefix('api/v1');
   app.use(helmet());
+  app.use(createOriginValidationMiddleware(frontendOrigins));
   app.use(cookieParser());
   app.use(json({ limit: '1mb' }));
   app.use(urlencoded({ extended: true, limit: '1mb' }));
   app.enableCors({
-    origin: frontendOrigin,
+    origin: frontendOrigins,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   });
