@@ -1,7 +1,96 @@
-import {createContext,useContext,useState,type ReactNode} from 'react'
-import {initialPastStreams,type PastStream,type StreamVisibility} from './contentData'
-type Toast={id:number;text:string}
-type Ctx={signedIn:boolean;setSignedIn:(v:boolean)=>void;followed:Set<string>;toggleFollow:(id:string)=>void;sidebar:boolean;setSidebar:(v:boolean)=>void;toast:(text:string)=>void;appearance:string;setAppearance:(v:string)=>void;lowData:boolean;setLowData:(v:boolean)=>void;pastStreams:PastStream[];addPastStream:(s:PastStream)=>void;updatePastStream:(id:string,patch:Partial<PastStream>)=>void;deletePastStream:(id:string)=>void;bulkVisibility:(ids:string[],visibility:StreamVisibility)=>void}
-const AppContext=createContext<Ctx|null>(null)
-export function AppProvider({children}:{children:ReactNode}){const [signedIn,setSignedIn]=useState(true);const [followed,setFollowed]=useState(new Set(['gamer-wa-mtaa','code-njeri','mombasa-vibes']));const [sidebar,setSidebar]=useState(true);const [toasts,setToasts]=useState<Toast[]>([]);const [appearance,setAppearance]=useState('dark');const [lowData,setLowData]=useState(false);const [pastStreams,setPastStreams]=useState(initialPastStreams);const toast=(text:string)=>{const id=Date.now();setToasts(x=>[...x,{id,text}]);setTimeout(()=>setToasts(x=>x.filter(t=>t.id!==id)),2600)};const toggleFollow=(id:string)=>setFollowed(old=>{const n=new Set(old);n.has(id)?n.delete(id):n.add(id);toast(n.has(id)?'Creator followed':'Creator unfollowed');return n});const addPastStream=(s:PastStream)=>setPastStreams(x=>[s,...x]);const updatePastStream=(id:string,patch:Partial<PastStream>)=>setPastStreams(x=>x.map(s=>s.id===id?{...s,...patch}:s));const deletePastStream=(id:string)=>setPastStreams(x=>x.filter(s=>s.id!==id));const bulkVisibility=(ids:string[],visibility:StreamVisibility)=>setPastStreams(x=>x.map(s=>ids.includes(s.id)?{...s,visibility}:s));return <AppContext.Provider value={{signedIn,setSignedIn,followed,toggleFollow,sidebar,setSidebar,toast,appearance,setAppearance,lowData,setLowData,pastStreams,addPastStream,updatePastStream,deletePastStream,bulkVisibility}}><div className={`theme-${appearance}`}>{children}</div><div className="toasts" aria-live="polite">{toasts.map(t=><div className="toast" key={t.id}>{t.text}</div>)}</div></AppContext.Provider>}
-export const useApp=()=>{const c=useContext(AppContext);if(!c)throw new Error('AppProvider missing');return c}
+import { createContext, useContext, useState, type ReactNode } from "react";
+import {
+  initialPastStreams,
+  type PastStream,
+  type StreamVisibility,
+} from "./contentData";
+
+type Toast = { id: number; text: string };
+type Ctx = {
+  followed: Set<string>;
+  toggleFollow: (id: string) => void;
+  sidebar: boolean;
+  setSidebar: (v: boolean) => void;
+  toast: (text: string) => void;
+  appearance: string;
+  setAppearance: (v: string) => void;
+  lowData: boolean;
+  setLowData: (v: boolean) => void;
+  pastStreams: PastStream[];
+  addPastStream: (s: PastStream) => void;
+  updatePastStream: (id: string, patch: Partial<PastStream>) => void;
+  deletePastStream: (id: string) => void;
+  bulkVisibility: (ids: string[], visibility: StreamVisibility) => void;
+};
+const AppContext = createContext<Ctx | null>(null);
+
+export function AppProvider({ children }: { children: ReactNode }) {
+  const [followed, setFollowed] = useState(
+    new Set(["gamer-wa-mtaa", "code-njeri", "mombasa-vibes"]),
+  );
+  const [sidebar, setSidebar] = useState(true),
+    [toasts, setToasts] = useState<Toast[]>([]);
+  const [appearance, setAppearance] = useState("dark"),
+    [lowData, setLowData] = useState(false);
+  const [pastStreams, setPastStreams] = useState(initialPastStreams);
+  const toast = (text: string) => {
+    const id = Date.now();
+    setToasts((x) => [...x, { id, text }]);
+    setTimeout(() => setToasts((x) => x.filter((t) => t.id !== id)), 2600);
+  };
+  const toggleFollow = (id: string) =>
+    setFollowed((old) => {
+      const next = new Set(old);
+      next.has(id) ? next.delete(id) : next.add(id);
+      toast(next.has(id) ? "Creator followed" : "Creator unfollowed");
+      return next;
+    });
+  const addPastStream = (stream: PastStream) =>
+    setPastStreams((x) => [stream, ...x]);
+  const updatePastStream = (id: string, patch: Partial<PastStream>) =>
+    setPastStreams((x) =>
+      x.map((stream) => (stream.id === id ? { ...stream, ...patch } : stream)),
+    );
+  const deletePastStream = (id: string) =>
+    setPastStreams((x) => x.filter((stream) => stream.id !== id));
+  const bulkVisibility = (ids: string[], visibility: StreamVisibility) =>
+    setPastStreams((x) =>
+      x.map((stream) =>
+        ids.includes(stream.id) ? { ...stream, visibility } : stream,
+      ),
+    );
+  return (
+    <AppContext.Provider
+      value={{
+        followed,
+        toggleFollow,
+        sidebar,
+        setSidebar,
+        toast,
+        appearance,
+        setAppearance,
+        lowData,
+        setLowData,
+        pastStreams,
+        addPastStream,
+        updatePastStream,
+        deletePastStream,
+        bulkVisibility,
+      }}
+    >
+      <div className={`theme-${appearance}`}>{children}</div>
+      <div className="toasts" aria-live="polite">
+        {toasts.map((item) => (
+          <div className="toast" key={item.id}>
+            {item.text}
+          </div>
+        ))}
+      </div>
+    </AppContext.Provider>
+  );
+}
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) throw new Error("AppProvider missing");
+  return context;
+};

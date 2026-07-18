@@ -1,217 +1,90 @@
 # Jukwaa API
 
-NestJS and PostgreSQL backend foundation for Jukwaa Live. Stage 2 adds Prisma ORM, migrations, database health, and the initial identity/creator/channel schema while the existing React frontend remains mock-driven.
+NestJS, Prisma, and PostgreSQL API for Jukwaa Live. Stage 3 implements public email/password authentication with database-backed opaque sessions.
 
-## Technology
+## Authentication architecture
 
-- Node.js 20.19 or newer
-- NestJS 11 and TypeScript
-- PostgreSQL 17 for the optional local Docker environment
-- Prisma ORM 7 with the `pg` driver through `@prisma/adapter-pg`
-- NestJS ConfigModule with strict startup environment validation
-- Helmet, controlled CORS, bounded request parsing, and global DTO validation
-- Jest and Supertest for deterministic unit and HTTP tests
+- Passwords are hashed by a dedicated service with Argon2id (`memoryCost=19456 KiB`, `timeCost=2`, `parallelism=1`). Passwords are 12–128 characters, are never trimmed, and are never logged or serialized.
+- Every login creates an independent `AuthSession`. A cryptographically random 32-byte raw token is sent only in the `jukwaa_session` cookie; PostgreSQL stores only its SHA-256 hash.
+- The cookie is HttpOnly, SameSite=Lax, Path=/, persistent for the configured lifetime, and Secure only in production so localhost remains usable.
+- `AuthGuard` hashes the cookie token, checks session expiry/revocation, loads the user, and denies suspended, banned, deactivated, or soft-deleted accounts.
+- Email-verification and password-reset tokens are also random 32-byte values with only SHA-256 hashes stored. They are expiring and single-use.
+- Resetting a password revokes every session and consumes all other outstanding reset tokens.
 
-Authentication, passwords, JWTs, streaming, payments, and other product modules are not included.
+## Database additions
 
-## Structure
+Migration `20260718130000_add_authentication` adds nullable `User.passwordHash`, `AuthSession`, `EmailVerificationToken`, and `PasswordResetToken`, with unique token hashes, foreign keys, expiry/user indexes, and no changes to existing identity, creator, channel, or enum data.
 
-```text
-backend/
-  prisma/
-    migrations/             Reviewed PostgreSQL migration history
-    schema.prisma           User, CreatorProfile, and Channel schema
-    seed.ts                 Explicit development-only seed
-  src/
-    common/filters/         Central HTTP error responses
-    config/                 Application configuration and validation
-    database/               Global DatabaseModule and Prisma lifecycle
-    generated/prisma/       Generated client; local-only and Git-ignored
-    health/                 API and database health endpoint
-    app.module.ts
-    app.setup.ts
-    main.ts
-  test/
-    health.e2e-spec.ts
-    database.integration-spec.ts
-  compose.yaml              Optional local PostgreSQL service
-  prisma.config.ts          Prisma CLI, migration, and seed configuration
-```
+## Endpoints
+
+All routes use the `/api/v1` prefix.
+
+| Method | Route | Purpose |
+|---|---|---|
+| POST | `/auth/register` | Create an account, verification token, session, and cookie |
+| POST | `/auth/login` | Login with normalized email or username |
+| GET | `/auth/me` | Return the safe authenticated user |
+| POST | `/auth/logout` | Revoke only the current session and clear its cookie |
+| POST | `/auth/logout-all` | Revoke all sessions for the authenticated user |
+| POST | `/auth/email/resend` | Send a new verification link with an enumeration-safe response |
+| POST | `/auth/email/verify` | Consume a verification token transactionally |
+| POST | `/auth/password/forgot` | Send a reset link with the same response for known/unknown email |
+| POST | `/auth/password/reset` | Consume a reset token, update password, and revoke sessions |
+
+Login failures are generic. Safe user responses omit password/session/token hashes and all raw secrets.
 
 ## Environment
 
-Copy `.env.example` to `.env`. The committed URL contains development-only credentials; replace it for any non-local environment.
+Copy `.env.example` to `.env`:
 
 ```dotenv
 NODE_ENV=development
 PORT=3000
 FRONTEND_ORIGIN=http://localhost:5173
 DATABASE_URL=postgresql://jukwaa:jukwaa_dev_only@localhost:5432/jukwaa_dev
+TRUST_PROXY=false
+SESSION_TTL_DAYS=30
+EMAIL_DELIVERY_MODE=console
+MAIL_FROM=Jukwaa Live <no-reply@jukwaa.live>
 ```
 
-`DATABASE_URL` is required and must use the `postgresql://` or `postgres://` scheme. It is never logged or returned by the health endpoint. A production environment must also provide `FRONTEND_ORIGIN` explicitly.
+For SMTP, set `EMAIL_DELIVERY_MODE=smtp` plus `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, and `MAIL_FROM`. Console delivery prints development-only verification/reset URLs and is rejected at startup in production.
 
-## Local PostgreSQL
+Rate limiting is enforced globally with tighter per-route limits on registration, login, verification resend/consume, and password reset requests. The default store is process-local; use a shared throttler store before horizontally scaling. Set `TRUST_PROXY=true` only when the API is actually behind a trusted reverse proxy; arbitrary forwarded headers are not trusted by default.
 
-Docker is optional. Any standard PostgreSQL provider can be used by supplying its normal connection URL.
-
-With Docker available:
-
-```bash
-cd backend
-docker compose up -d postgres
-docker compose ps
-```
-
-The Compose service uses the PostgreSQL 17 major release, a named persistent volume, a health check, and development-only credentials matching `.env.example`.
-
-Stop the service without deleting its data:
-
-```bash
-docker compose stop postgres
-```
-
-## Installation and Prisma Client
+## Install, migrate, and run
 
 ```bash
 cd backend
 npm install
+cp .env.example .env
+docker compose up -d postgres
 npm run prisma:validate
 npm run prisma:generate
-```
-
-Prisma 7 generates its CommonJS-compatible client into `src/generated/prisma`. Generated code is not committed and must be regenerated after schema or dependency changes.
-
-## Migrations
-
-Create and apply a migration during development:
-
-```bash
-npm run db:migrate -- --name describe_the_change
-```
-
-`prisma migrate dev` compares the development database with the Prisma schema, creates a new migration, and applies it. It is a development workflow and may require a shadow database.
-
-Apply already-reviewed migrations in production or CI:
-
-```bash
 npm run db:migrate:deploy
-```
-
-`prisma migrate deploy` only applies committed migration files. It does not create migrations, reset the schema, or seed data. Production startup does not automatically run destructive migration commands.
-
-## Development seed
-
-After applying migrations:
-
-```bash
-npm run db:seed
-```
-
-The seed is explicit, idempotent where practical, and refuses to run when `NODE_ENV=production`. It creates two fictional users, one creator profile, and one channel, then verifies the `User -> CreatorProfile -> Channel` relation. It does not create passwords or financial data.
-
-## Prisma Studio
-
-```bash
-npm run db:studio
-```
-
-Studio uses the configured `DATABASE_URL`; do not expose it publicly or use production credentials casually.
-
-## Identity normalization
-
-Stage 3 must trim and lowercase email, username, and channel slug values before writing them. The initial migration reinforces that rule with PostgreSQL check constraints, while unique indexes prevent duplicate normalized identities. This avoids identities that differ only by accidental capitalization without adding provider-specific identity logic to the application.
-
-## Run the backend
-
-```bash
 npm run start:dev
 ```
 
-- Backend: `http://localhost:3000`
-- API base: `http://localhost:3000/api/v1`
-- Health: `http://localhost:3000/api/v1/health`
-
-The health endpoint performs a lightweight `SELECT 1`. It returns `checks.database: "up"` when PostgreSQL responds and HTTP 503 with `checks.database: "down"` otherwise. Database connection details and internal query errors are never included.
-
-Production build and start:
-
-```bash
-npm run prisma:generate
-npm run build
-npm run db:migrate:deploy
-npm run start:prod
-```
+Registration and password recovery print development-only email URLs to the backend terminal when console delivery is enabled. Open those frontend URLs to verify or reset the account.
 
 ## Tests and quality checks
 
-Deterministic checks do not require a running PostgreSQL server:
-
 ```bash
+npm run prisma:validate
+npm run prisma:generate
 npm run lint
 npm run test
 npm run test:e2e
 npm run build
 ```
 
-They mock database connectivity where appropriate and cover configuration validation, Prisma lifecycle, and database-up/database-down health behavior.
+The normal suite is deterministic without PostgreSQL and covers password/token hashing, DTO normalization, safe registration/login behavior, account statuses, session expiry/revocation, verification, password reset, and health behavior.
 
-The optional database integration suite verifies real relations and uniqueness constraints after migrations are applied:
-
-PowerShell:
+With a migrated PostgreSQL database available:
 
 ```powershell
 $env:RUN_DATABASE_INTEGRATION_TESTS='true'
 npm run test:db
 ```
 
-Bash:
-
-```bash
-RUN_DATABASE_INTEGRATION_TESTS=true npm run test:db
-```
-
-Without `RUN_DATABASE_INTEGRATION_TESTS=true`, that suite is skipped and never contacts PostgreSQL.
-
-## Run the full local stack
-
-Use three terminals from the repository root.
-
-Terminal 1 — PostgreSQL:
-
-```bash
-cd backend
-docker compose up -d postgres
-npm run db:migrate:deploy
-npm run db:seed
-```
-
-Terminal 2 — backend:
-
-```bash
-cd backend
-npm run prisma:generate
-npm run start:dev
-```
-
-Terminal 3 — existing frontend:
-
-```bash
-npm install
-npm run dev
-```
-
-Frontend: `http://localhost:5173`
-
-Backend: `http://localhost:3000`
-
-The frontend still uses local mock data in Stage 2 and never connects directly to PostgreSQL.
-
-## Production safety
-
-- Real `.env` files and generated Prisma clients are Git-ignored.
-- Migrations are version-controlled and reviewed before deployment.
-- Development seeds refuse production execution and never run automatically.
-- No schema reset or destructive migration command is provided.
-- Database URLs, credentials, and internal database errors must never be logged.
-- Logs must also exclude passwords, JWTs, refresh tokens, stream keys, M-Pesa credentials, and payment secrets.
+Real `.env` files, generated Prisma client code, `node_modules`, `dist`, and coverage are Git-ignored. Migration deployment never resets the database and development seed execution remains explicit.

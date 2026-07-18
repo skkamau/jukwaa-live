@@ -1,46 +1,55 @@
 # Jukwaa Live
 
-**Kenya is live.** Jukwaa Live is a polished Phase 1 frontend demo for a Kenyan-first livestreaming platform. It is designed for creator demos, user testing, and partner conversations before backend development begins.
-
-## Demo features
-
-- Responsive home, browse, following, category, watch, creator, clips, dashboard, earnings, settings, and go-live routes
-- 12 fictional live streams, 12 creators, 10 categories, 12 clips, 22 chat messages, 4 events, and 8 earnings transactions
-- Local stream/creator search and filtering
-- Follow/unfollow state shared across the experience
-- Interactive local live chat and simulated player controls
-- Demo M-Pesa support and withdrawal modals (no payment requests)
-- Three-second go-live countdown, local LIVE state, and duration timer
-- Appearance, autoplay, low-data, quality, and safety preferences
-- Signed-in/signed-out demo toggle, notifications, responsive sidebar, and mobile bottom navigation
+**Kenya is live.** Jukwaa Live is a Kenyan-first livestreaming platform prototype. Stage 3 adds real email/password authentication while preserving the existing fictional streams, creators, clips, chat, analytics, earnings, and studio experiences as demo content.
 
 ## Technology
 
-React 19, Vite, TypeScript, Tailwind CSS 4, React Router, and Lucide React.
+- React 19, Vite, TypeScript, Tailwind CSS 4, React Router, and Lucide React
+- NestJS 11, Prisma 7, and PostgreSQL
+- Argon2id password hashing and database-backed opaque sessions
 
-## Run locally
+## Run the full stack locally
 
-Requires Node.js 20 or newer.
+Requires Node.js 20.19+, npm, and PostgreSQL. Docker Compose can provide PostgreSQL when Docker is installed.
+
+```bash
+cp .env.example .env
+cd backend
+cp .env.example .env
+npm install
+docker compose up -d postgres
+npm run prisma:generate
+npm run db:migrate:deploy
+npm run start:dev
+```
+
+In a second terminal:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite.
+Open `http://localhost:5173`. The frontend uses `VITE_API_BASE_URL` (default `http://localhost:3000/api/v1`) and sends cookies with `credentials: "include"`. No backend secret belongs in a `VITE_*` variable.
+
+Register at `/register`. In development console-email mode, copy the clearly labelled verification or reset URL from the backend terminal. Authentication persists through the `jukwaa_session` HttpOnly cookie; it is never stored in localStorage or exposed to React.
 
 ## Quality checks
 
 ```bash
 npm run typecheck
 npm run build
-npm run preview
+cd backend
+npm run prisma:validate
+npm run prisma:generate
+npm run lint
+npm run test
+npm run test:e2e
+npm run build
 ```
 
-## Current limitations
+Real database integration tests require migrated PostgreSQL and `RUN_DATABASE_INTEGRATION_TESTS=true`; see [backend/README.md](backend/README.md).
 
-This phase is frontend-only. All data and interactions are local and reset on refresh. Video, authentication, chat, notifications, M-Pesa support, withdrawals, and account deletion are simulations. No camera, microphone, payment provider, database, or external creator content is accessed.
+## Stage 3 scope
 
-## Planned Phase 2
-
-Real authentication; livestream ingestion and playback; OBS stream keys; mobile camera streaming; WebSocket chat; M-Pesa Daraja payments; creator payouts; PostgreSQL; admin moderation; recording and clips generation; push notifications; analytics; recommendations; and cloud storage.
+Real account registration, login, current-user session restoration, logout, logout-all, email verification, forgot/reset password, and authentication rate limiting are implemented. Creator onboarding, real streaming/chat/follows/analytics, OAuth, 2FA, M-Pesa, payments, ads, monetisation, and payouts are intentionally deferred.
