@@ -31,8 +31,10 @@ export class RegisterDto {
   displayName: string;
 
   @IsString()
-  @MinLength(12)
+  @MinLength(8)
   @MaxLength(128)
+  @Matches(/[A-Za-z]/, { message: 'password must contain at least one letter' })
+  @Matches(/[0-9]/, { message: 'password must contain at least one number' })
   password: string;
 }
 
@@ -63,7 +65,9 @@ export class TokenDto {
 
 export class ResetPasswordDto extends TokenDto {
   @IsString()
-  @MinLength(12)
+  @MinLength(8)
   @MaxLength(128)
+  @Matches(/[A-Za-z]/, { message: 'password must contain at least one letter' })
+  @Matches(/[0-9]/, { message: 'password must contain at least one number' })
   password: string;
 }

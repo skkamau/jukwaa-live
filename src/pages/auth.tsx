@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useId,
   useRef,
   useState,
   type FormEvent,
@@ -14,6 +15,8 @@ import {
 import {
   ArrowRight,
   CheckCircle2,
+  Eye,
+  EyeOff,
   KeyRound,
   Mail,
   Radio,
@@ -62,6 +65,56 @@ const messageOf = (error: unknown) =>
     ? error.message
     : "Something went wrong. Please try again.";
 
+const newPasswordPattern = "(?=.*[A-Za-z])(?=.*[0-9]).{8,128}";
+
+function PasswordField({
+  label,
+  value,
+  onChange,
+  autoComplete,
+  newPassword = false,
+  hint,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  autoComplete: "current-password" | "new-password";
+  newPassword?: boolean;
+  hint?: string;
+}) {
+  const id = useId();
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="auth-field">
+      <label htmlFor={id}>{label}</label>
+      <div className="password-input">
+        <input
+          id={id}
+          type={visible ? "text" : "password"}
+          autoComplete={autoComplete}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          minLength={newPassword ? 8 : undefined}
+          maxLength={128}
+          pattern={newPassword ? newPasswordPattern : undefined}
+          title={newPassword ? "Use 8–128 characters with at least one letter and one number." : undefined}
+          required
+        />
+        <button
+          type="button"
+          className="password-visibility"
+          aria-label={`${visible ? "Hide" : "Show"} ${label.toLowerCase()}`}
+          aria-pressed={visible}
+          onClick={() => setVisible((current) => !current)}
+        >
+          {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+        </button>
+      </div>
+      {hint && <small>{hint}</small>}
+    </div>
+  );
+}
+
 export function LoginPage() {
   const { login, isAuthenticated } = useAuth(),
     navigate = useNavigate(),
@@ -109,16 +162,12 @@ export function LoginPage() {
             required
           />
         </label>
-        <label>
-          Password
-          <input
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </label>
+        <PasswordField
+          label="Password"
+          autoComplete="current-password"
+          value={password}
+          onChange={setPassword}
+        />
         <div className="auth-form-row">
           <Link to="/forgot-password">Forgot password?</Link>
         </div>
@@ -219,29 +268,21 @@ export function RegisterPage() {
             required
           />
         </label>
-        <label>
-          Password
-          <input
-            type="password"
-            autoComplete="new-password"
-            value={form.password}
-            onChange={(e) => update("password")(e.target.value)}
-            minLength={12}
-            maxLength={128}
-            required
-          />
-          <small>Use 12–128 characters. Spaces are allowed.</small>
-        </label>
-        <label>
-          Confirm password
-          <input
-            type="password"
-            autoComplete="new-password"
-            value={confirm}
-            onChange={(event) => setConfirm(event.target.value)}
-            required
-          />
-        </label>
+        <PasswordField
+          label="Password"
+          autoComplete="new-password"
+          value={form.password}
+          onChange={update("password")}
+          newPassword
+          hint="Use 8–128 characters with at least one letter and one number. Spaces are allowed."
+        />
+        <PasswordField
+          label="Confirm password"
+          autoComplete="new-password"
+          value={confirm}
+          onChange={setConfirm}
+          newPassword
+        />
         <label className="terms-check">
           <input
             type="checkbox"
@@ -391,28 +432,21 @@ export function ResetPasswordPage() {
               {error}
             </div>
           )}
-          <label>
-            New password
-            <input
-              type="password"
-              autoComplete="new-password"
-              minLength={12}
-              maxLength={128}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </label>
-          <label>
-            Confirm password
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-            />
-          </label>
+          <PasswordField
+            label="New password"
+            autoComplete="new-password"
+            value={password}
+            onChange={setPassword}
+            newPassword
+            hint="Use 8–128 characters with at least one letter and one number."
+          />
+          <PasswordField
+            label="Confirm password"
+            autoComplete="new-password"
+            value={confirm}
+            onChange={setConfirm}
+            newPassword
+          />
           <button className="btn btn-accent full" disabled={busy || !token}>
             <KeyRound /> {busy ? "Updating…" : "Update password"}
           </button>
