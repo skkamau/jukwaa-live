@@ -10,6 +10,12 @@ export default registerAs(APP_CONFIG_KEY, () => ({
   trustProxy: process.env.TRUST_PROXY === 'true',
   sessionDays: Number(process.env.SESSION_TTL_DAYS ?? 30),
   mailMode: process.env.EMAIL_DELIVERY_MODE ?? 'console',
+  streaming: {
+    provider: process.env.STREAMING_PROVIDER ?? 'mock',
+    statusSyncSeconds: Number(process.env.STREAM_STATUS_SYNC_SECONDS ?? 10),
+    allowProductionMock:
+      process.env.ALLOW_MOCK_STREAMING_IN_PRODUCTION === 'true',
+  },
   smtp: {
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT ?? 587),

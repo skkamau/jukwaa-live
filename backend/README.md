@@ -4,6 +4,14 @@ NestJS, Prisma, and PostgreSQL API for Jukwaa Live. Stage 3 implements public em
 
 Stage 4 adds authenticated user profiles, verified-user creator onboarding, owned channel editing, and safe public channel lookup. The existing `User`, `CreatorProfile`, and `Channel` schema already enforces one creator profile per user and one channel per creator, so Stage 4 requires no database migration.
 
+Stage 5A adds `Stream`, `StreamStatus`, `StreamingProviderType`, and `StreamingChannelConfig`. Migration `20260718170000_add_streaming_foundation` preserves existing data and includes a PostgreSQL partial unique index that permits at most one `PREPARING` or `LIVE` stream per channel, including under concurrent requests.
+
+## Streaming architecture
+
+Application services depend on the `StreamingProvider` token, not an RTMP server or cloud SDK. `MockStreamingProvider` is the only Stage 5A implementation. It maintains deterministic process-local provider status for development/tests and returns a development placeholder rather than video. `StreamStatusSyncService` maps provider-active channel IDs to `StreamLifecycleService`, which centrally validates and applies `PREPARING -> LIVE` and `LIVE -> ENDED` transitions. Cancelling a prepared stream preserves it as `CANCELLED`.
+
+The generic database configuration isolates provider channel IDs, ingest endpoints, and safe playback URLs from stream business records. It stores no stream key. `LOCAL` and `AMAZON_IVS` enum values reserve clean future integration points; neither provider is implemented.
+
 ## Authentication architecture
 
 - Passwords are hashed by a dedicated service with Argon2id (`memoryCost=19456 KiB`, `timeCost=2`, `parallelism=1`). Passwords are 12–128 characters, are never trimmed, and are never logged or serialized.
@@ -38,6 +46,15 @@ All routes use the `/api/v1` prefix.
 | POST | `/creators/me` | Atomically create one creator profile and channel |
 | PATCH | `/creators/me/channel` | Update the owner's channel name and description |
 | GET | `/channels/:slug` | Read safe public information for an active channel |
+| GET | `/creators/me/streaming` | Read safe provider mode/capabilities for the owner |
+| POST | `/streams/me/prepare` | Create or return the owner's `PREPARING` stream |
+| GET | `/streams/me/current` | Read the owner's latest stream |
+| PATCH | `/streams/me/current` | Update owned active stream metadata |
+| POST | `/streams/me/current/cancel` | Preserve a prepared stream as `CANCELLED` |
+| POST | `/streams/me/current/simulate-live` | Development/mock-only provider simulation |
+| POST | `/streams/me/current/simulate-end` | Development/mock-only provider simulation |
+| GET | `/streams/live` | List safe provider-confirmed `LIVE` streams |
+| GET | `/streams/:id` | Read safe public stream state and playback metadata |
 
 Login failures are generic. Safe user responses omit password/session/token hashes and all raw secrets.
 
@@ -56,7 +73,12 @@ TRUST_PROXY=false
 SESSION_TTL_DAYS=30
 EMAIL_DELIVERY_MODE=console
 MAIL_FROM=Jukwaa Live <no-reply@jukwaa.live>
+STREAMING_PROVIDER=mock
+STREAM_STATUS_SYNC_SECONDS=10
+ALLOW_MOCK_STREAMING_IN_PRODUCTION=false
 ```
+
+Only `mock` is accepted in Stage 5A. Production requires explicit mock opt-in, and simulation controls are still denied whenever `NODE_ENV=production`. Public responses omit provider stream IDs, credentials, emails, sessions, token data, and infrastructure secrets.
 
 For SMTP, set `EMAIL_DELIVERY_MODE=smtp` plus `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, and `MAIL_FROM`. Console delivery prints development-only verification/reset URLs and is rejected at startup in production.
 

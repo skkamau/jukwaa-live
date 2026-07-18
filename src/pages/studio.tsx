@@ -56,7 +56,7 @@ export function DashboardPage() {
         <ZeroStat label="Earnings" icon={CircleDollarSign} unavailable />
       </div>
       <div className="dashboard-grid">
-        <section className="panel dashboard-zero"><Radio /><h2>No streams yet</h2><p>Your real broadcasts will appear here after livestreaming is enabled. Go Live remains a simulation in this stage.</p><Link className="btn btn-accent" to="/go-live">Open Go Live studio</Link></section>
+        <section className="panel dashboard-zero"><Radio /><h2>Streaming foundation ready</h2><p>Prepare a real stream record, then use the development mock provider to test the provider-confirmed lifecycle. Mock mode does not deliver video.</p><Link className="btn btn-accent" to="/go-live">Open Creator Studio</Link></section>
         <section className="panel dashboard-zero"><Users /><h2>Build your first audience</h2><p>Share your public channel URL. Followers and community activity will start from zero.</p><button className="btn btn-muted" onClick={() => navigator.clipboard?.writeText(`${location.origin}/channel/${channel.slug}`)}>Copy channel link</button></section>
       </div>
     </div>

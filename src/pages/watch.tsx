@@ -1,14 +1,20 @@
 import {useEffect,useRef,useState} from 'react'
 import {Link,useParams} from 'react-router-dom'
-import {Ban,ChevronRight,Clock,Copy,Ellipsis,Flag,Headphones,Maximize2,MessageSquareOff,Pause,Play,Send,Settings,Share2,Shield,Smile,Trash2,UserRoundX,Volume2,X} from 'lucide-react'
+import {AlertTriangle,Ban,ChevronRight,Clock,Copy,Ellipsis,Flag,Headphones,Maximize2,MessageSquareOff,Pause,Play,Radio,Send,Settings,Share2,Shield,Smile,Trash2,UserRoundX,Volume2,X} from 'lucide-react'
 import {APP,chatMessages,creatorById,formatCount,money,streams} from '../data'
 import {Avatar,FollowButton,LiveBadge,Modal,StreamCard,ViewerCount} from '../components'
 import {useApp} from '../context'
+import {streamsApi,type PublicStream} from '../api/streams'
+import {demoContentEnabled} from '../liveStreams'
 
 const description='Late-night Nairobi stories, culture and unfiltered conversation with the Jukwaa community. Pull up, share where you are watching from, and keep the chat respectful.'
 
 export function WatchPage(){
   const {streamId}=useParams();
+  return streams.some(stream=>stream.id===streamId)?<DemoWatchPage streamId={streamId??streams[0].id}/>:<RealWatchPage streamId={streamId??''}/>
+}
+
+function DemoWatchPage({streamId}:{streamId:string}){
   const stream=streams.find(s=>s.id===streamId)??streams[0],creator=creatorById(stream.creatorId)
   const [playing,setPlaying]=useState(true),[quality,setQuality]=useState('Auto'),[chatOpen,setChatOpen]=useState(true),[support,setSupport]=useState(false),[moreOpen,setMoreOpen]=useState(false)
   const {toast}=useApp()
@@ -39,6 +45,38 @@ export function WatchPage(){
     <section className="section"><div className="section-head"><h2>More From {creator.name}</h2><Link to={`/creator/${creator.id}`}>View profile <ChevronRight/></Link></div><div className="past-broadcast-grid">{['City stories you sent us','Nairobi after hours: community call-in','The week that was in the 254'].map((title,i)=><Link to={`/watch/${stream.id}`} className="past-broadcast" key={title}><div className="broadcast-thumb" style={{'--accent':creator.accent} as React.CSSProperties}><Play/><span>{['1:42:18','2:08:44','1:16:09'][i]}</span></div><b>{title}</b><small>{[18400,12700,9600][i].toLocaleString()} views · {i+2} days ago</small></Link>)}</div></section>
     <SupportModal open={support} onClose={()=>setSupport(false)} creator={creator.name}/>
   </div>
+}
+
+function RealWatchPage({streamId}:{streamId:string}){
+  const [stream,setStream]=useState<PublicStream|null>(null),[loading,setLoading]=useState(true),[unavailable,setUnavailable]=useState(false)
+  const {toast}=useApp()
+  useEffect(()=>{setLoading(true);streamsApi.detail(streamId).then(result=>setStream(result.stream)).catch(()=>setUnavailable(true)).finally(()=>setLoading(false))},[streamId])
+  if(loading)return <div className="auth-loading">Loading stream…</div>
+  if(unavailable||!stream)return <div className="page channel-missing"><AlertTriangle/><h1>Stream unavailable</h1><p>This stream does not exist or its channel is not public.</p><Link className="btn btn-accent" to="/browse">Browse live streams</Link></div>
+  const description=stream.description||"This creator has not added a stream description."
+  return <div className="watch-page real-watch-page">
+    <div className="watch-layout no-chat">
+      <div className="watch-main">
+        <StreamPlayer stream={stream}/>
+        <section className="stream-info">
+          <h1>{stream.title}</h1>
+          <div className="creator-row">
+            {stream.creator.avatarUrl?<img className="avatar lg" src={stream.creator.avatarUrl} alt=""/>:<span className="avatar lg real-stream-initials">{stream.creator.displayName.slice(0,2).toUpperCase()}</span>}
+            <div className="creator-details"><Link to={`/channel/${stream.channel.slug}`}><b>{stream.creator.displayName}</b></Link><span>@{stream.creator.username} · 0 followers</span><span>{stream.category} · {stream.language}</span></div>
+            <div className="stream-actions"><button className="btn btn-muted" onClick={()=>{void navigator.clipboard?.writeText(location.href);toast('Stream link copied')}}><Share2/> Share</button></div>
+          </div>
+          <p className="stream-description">{description}</p>
+        </section>
+      </div>
+    </div>
+    <section className="about-stream"><div><span className="section-kicker">REAL STREAM RECORD</span><h2>About this stream</h2><p>{description}</p></div><dl><div><dt>Status</dt><dd>{stream.status}</dd></div><div><dt>Started</dt><dd>{stream.startedAt?new Date(stream.startedAt).toLocaleString():"Not started"}</dd></div><div><dt>Category</dt><dd>{stream.category}</dd></div><div><dt>Language</dt><dd>{stream.language}</dd></div><div><dt>Tags</dt><dd className="tags">{stream.tags.length?stream.tags.map(tag=><span key={tag}>{tag}</span>):"None"}</dd></div></dl></section>
+    {demoContentEnabled&&<section className="section demo-recommendations"><div className="section-head"><div><span className="section-kicker">FICTIONAL DEMO CONTENT</span><h2>Explore the Jukwaa demo</h2></div><Link to="/browse">Browse all <ChevronRight/></Link></div><div className="stream-grid">{streams.slice(0,4).map(item=><StreamCard key={item.id} stream={item}/>)}</div></section>}
+  </div>
+}
+
+function StreamPlayer({stream}:{stream:PublicStream}){
+  const message=stream.status==='PREPARING'?'Waiting for the creator to go live.':stream.status==='ENDED'?'This stream has ended.':stream.status==='LIVE'&&stream.playback?.provider==='mock'?'Development livestream simulation':'Stream unavailable.'
+  return <div className={`player real-stream-player ${stream.status.toLowerCase()}`}><div className="player-top"><span className={`stream-state-pill ${stream.status.toLowerCase()}`}><i/>{stream.status}</span></div><div className="real-player-message"><Radio/><h2>{message}</h2><p>{stream.status==='LIVE'?'Mock mode confirms lifecycle and discovery only. No video is being delivered.':stream.recordingAvailable?'Recording available.':'No recording is available.'}</p></div></div>
 }
 
 type ChatMessage={id:number;user:string;text:string;badge?:string}

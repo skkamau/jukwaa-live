@@ -44,6 +44,24 @@ enum ChannelStatus {
   @@map("channel_status")
 }
 
+enum StreamStatus {
+  PREPARING
+  LIVE
+  ENDED
+  CANCELLED
+  FAILED
+
+  @@map("stream_status")
+}
+
+enum StreamingProviderType {
+  MOCK
+  LOCAL
+  AMAZON_IVS
+
+  @@map("streaming_provider_type")
+}
+
 model User {
   id              String          @id @default(uuid()) @db.Uuid
   email           String          @unique(map: "users_email_key") @db.VarChar(320)
@@ -139,8 +157,49 @@ model Channel {
   updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt        DateTime?      @map("deleted_at") @db.Timestamptz(3)
   creatorProfile   CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  streamingConfig  StreamingChannelConfig?
+  streams          Stream[]
 
   @@index([status], map: "channels_status_idx")
   @@index([createdAt], map: "channels_created_at_idx")
   @@map("channels")
+}
+
+model StreamingChannelConfig {
+  id                String                @id @default(uuid()) @db.Uuid
+  channelId         String                @unique(map: "streaming_channel_configs_channel_id_key") @map("channel_id") @db.Uuid
+  provider          StreamingProviderType
+  providerChannelId String?               @unique(map: "streaming_channel_configs_provider_channel_id_key") @map("provider_channel_id") @db.VarChar(255)
+  ingestEndpoint    String?               @map("ingest_endpoint") @db.VarChar(2048)
+  playbackUrl       String?               @map("playback_url") @db.VarChar(2048)
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  channel           Channel               @relation(fields: [channelId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([provider], map: "streaming_channel_configs_provider_idx")
+  @@map("streaming_channel_configs")
+}
+
+model Stream {
+  id                String                @id @default(uuid()) @db.Uuid
+  channelId         String                @map("channel_id") @db.Uuid
+  title             String                @db.VarChar(140)
+  description       String?               @db.VarChar(1000)
+  category          String                @db.VarChar(80)
+  language          String                @db.VarChar(40)
+  tags              String[]              @default([])
+  matureContent     Boolean               @default(false) @map("mature_content")
+  status            StreamStatus          @default(PREPARING)
+  streamingProvider StreamingProviderType @map("streaming_provider")
+  providerStreamId  String?               @map("provider_stream_id") @db.VarChar(255)
+  startedAt         DateTime?             @map("started_at") @db.Timestamptz(3)
+  endedAt           DateTime?             @map("ended_at") @db.Timestamptz(3)
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  channel           Channel               @relation(fields: [channelId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([channelId, createdAt], map: "streams_channel_id_created_at_idx")
+  @@index([status, startedAt], map: "streams_status_started_at_idx")
+  @@index([providerStreamId], map: "streams_provider_stream_id_idx")
+  @@map("streams")
 }

@@ -6,6 +6,8 @@ import {
   PrismaClient,
   UserRole,
   UserStatus,
+  StreamStatus,
+  StreamingProviderType,
 } from '../src/generated/prisma/client';
 
 const runDatabaseTests = process.env.RUN_DATABASE_INTEGRATION_TESTS === 'true';
@@ -29,6 +31,10 @@ describeDatabase('PostgreSQL identity schema integration', () => {
 
   afterAll(async () => {
     if (creatorProfileId) {
+      const channels = await prisma.channel.findMany({ where: { creatorProfileId }, select: { id: true } });
+      const channelIds = channels.map((channel) => channel.id);
+      await prisma.stream.deleteMany({ where: { channelId: { in: channelIds } } });
+      await prisma.streamingChannelConfig.deleteMany({ where: { channelId: { in: channelIds } } });
       await prisma.channel.deleteMany({ where: { creatorProfileId } });
       await prisma.creatorProfile.deleteMany({
         where: { id: creatorProfileId },
@@ -91,6 +97,47 @@ describeDatabase('PostgreSQL identity schema integration', () => {
     await expect(
       prisma.creatorProfile.create({ data: { userId } }),
     ).rejects.toMatchObject({ code: 'P2002' });
+  });
+
+  it('persists stream lifecycle records and enforces one active stream per channel', async () => {
+    const channel = await prisma.channel.findUniqueOrThrow({ where: { creatorProfileId } });
+    await prisma.streamingChannelConfig.create({
+      data: {
+        channelId: channel.id,
+        provider: StreamingProviderType.MOCK,
+        providerChannelId: `mock:${channel.id}`,
+      },
+    });
+    const prepared = await prisma.stream.create({
+      data: {
+        channelId: channel.id,
+        title: 'Stage 5A integration stream',
+        category: 'Technology',
+        language: 'English',
+        tags: ['testing'],
+        status: StreamStatus.PREPARING,
+        streamingProvider: StreamingProviderType.MOCK,
+      },
+    });
+    await expect(prisma.stream.create({
+      data: {
+        channelId: channel.id,
+        title: 'Conflicting stream',
+        category: 'Technology',
+        language: 'English',
+        streamingProvider: StreamingProviderType.MOCK,
+      },
+    })).rejects.toMatchObject({ code: 'P2002' });
+    await prisma.stream.update({
+      where: { id: prepared.id },
+      data: { status: StreamStatus.LIVE, startedAt: new Date() },
+    });
+    const ended = await prisma.stream.update({
+      where: { id: prepared.id },
+      data: { status: StreamStatus.ENDED, endedAt: new Date() },
+    });
+    expect(ended.startedAt).not.toBeNull();
+    expect(ended.endedAt).not.toBeNull();
   });
 
   it('rejects duplicate channel ownership and slugs', async () => {

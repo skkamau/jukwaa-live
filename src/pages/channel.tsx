@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Calendar, Radio, UserRound } from "lucide-react";
 import { profilesApi, type PublicChannel } from "../api/profiles";
+import { useLiveStreams } from "../liveStreams";
 
 export function ChannelPage() {
   const { slug = "" } = useParams();
   const [channel, setChannel] = useState<PublicChannel | null>(null);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
+  const liveStreams = useLiveStreams();
   useEffect(() => {
     setLoading(true);
     setMissing(false);
@@ -28,9 +30,10 @@ export function ChannelPage() {
       </div>
     );
   const initials = channel.creator.displayName.slice(0, 2).toUpperCase();
+  const liveStream = liveStreams.streams.find((stream) => stream.channel.slug === channel.slug);
   return (
     <div className="creator-page real-channel-page">
-      <div className="cover real-channel-cover"><span>JUKWAA CHANNEL · OFFLINE</span></div>
+      <div className={`cover real-channel-cover ${liveStream ? "is-live" : ""}`}><span>JUKWAA CHANNEL · {liveStream ? "LIVE" : "OFFLINE"}</span></div>
       <div className="profile-head">
         {channel.creator.avatarUrl ? (
           <img className="real-avatar" src={channel.creator.avatarUrl} alt="" />
@@ -46,19 +49,20 @@ export function ChannelPage() {
           <p>@{channel.creator.username}</p>
           <div><b>0</b> followers <b>0</b> past streams</div>
         </div>
-        <span className="offline-pill">Offline</span>
+        {liveStream ? <Link className="btn btn-accent channel-live-action" to={`/watch/${liveStream.id}`}><Radio /> Watch Live</Link> : <span className="offline-pill">Offline</span>}
       </div>
       <div className="real-channel-tabs"><button className="active">Home</button><button>About</button><button>Past Streams</button></div>
       <div className="profile-body">
         <div>
           <h2>About {channel.name}</h2>
+          {liveStream && <div className="channel-current-stream"><span>🔴 LIVE NOW</span><h3>{liveStream.title}</h3><p>{liveStream.category} · {liveStream.language}</p><Link className="btn btn-accent" to={`/watch/${liveStream.id}`}>Watch Live</Link></div>}
           <p className="bio">{channel.description || "This creator has not added a channel description yet."}</p>
           {channel.creator.bio && <p className="creator-bio"><b>Creator bio</b><br />{channel.creator.bio}</p>}
         </div>
         <aside className="schedule-card zero-card">
           <h3><Calendar /> Channel activity</h3>
-          <div><b>Status</b><span>Offline</span></div>
-          <div><b>Streams</b><span>0</span></div>
+          <div><b>Status</b><span>{liveStream ? "Live" : "Offline"}</span></div>
+          <div><b>Live now</b><span>{liveStream ? "1" : "0"}</span></div>
           <div><b>Followers</b><span>0</span></div>
         </aside>
       </div>

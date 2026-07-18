@@ -1,62 +1,185 @@
-import {useEffect,useRef,useState,type ReactNode} from 'react'
-import {Link} from 'react-router-dom'
-import {Ban,ChevronLeft,ChevronRight,Clock,Ellipsis,Headphones,Heart,MessageSquare,Mic,Pin,Radio,Send,Settings,Share2,Shield,Smile,Trash2,UserRoundX,Users,Volume2,X,Zap} from 'lucide-react'
-import {categories,chatMessages} from '../data'
-import {Modal} from '../components'
-import {useApp} from '../context'
-import {PageTitle} from './discovery'
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
+import {
+  CheckCircle2,
+  Code2,
+  Radio,
+  Save,
+  Shield,
+  Square,
+  X,
+} from "lucide-react";
+import { streamsApi, type PublicStream, type StreamInput, type StreamingConfiguration } from "../api/streams";
+import { useAuth } from "../auth";
+import { useCreator } from "../creator";
+import { categories } from "../data";
+import { PageTitle } from "./discovery";
 
-type StudioState='setup'|'countdown'|'live'|'summary'
-type Drawer='settings'|'moderation'|null
-type StreamConfig={title:string;category:string;language:string;tags:string;mature:boolean;chatMode:string;quality:string;slowMode:boolean;slowInterval:number;blockedWords:string;latency:string;autoQuality:boolean;autoAds:string}
-type StudioMessage={id:number;user:string;text:string;badge?:string;time:string}
-const initialConfig:StreamConfig={title:'Building a biashara app in React — live coding',category:'Technology',language:'English',tags:'React, Coding, Careers',mature:false,chatMode:'Everyone',quality:'720p · Recommended',slowMode:true,slowInterval:5,blockedWords:'spam, scam',latency:'Low latency',autoQuality:true,autoAds:'Off'}
-const activity=['+ New follower — Akinyi254','M-Pesa support — Demo','+5 new followers','Viewer milestone — 250 concurrent viewers','Ad break completed — Demo']
+const initialInput: StreamInput = {
+  title: "",
+  description: "",
+  category: "Just Chatting",
+  language: "English",
+  tags: [],
+  matureContent: false,
+};
 
-export function GoLivePage(){
-  const [state,setState]=useState<StudioState>('setup'),[count,setCount]=useState(3),[seconds,setSeconds]=useState(0),[config,setConfig]=useState(initialConfig),[drawer,setDrawer]=useState<Drawer>(null),[adOpen,setAdOpen]=useState(false),[endOpen,setEndOpen]=useState(false),[chatOpen,setChatOpen]=useState(true)
-  const {toast,addPastStream}=useApp()
-  useEffect(()=>{if(state==='countdown'){const timer=setInterval(()=>setCount(n=>{if(n<=1){clearInterval(timer);setState('live');return 0}return n-1}),1000);return()=>clearInterval(timer)}if(state==='live'){const timer=setInterval(()=>setSeconds(n=>n+1),1000);return()=>clearInterval(timer)}},[state])
-  const duration=formatDuration(seconds)
-  if(state==='summary')return <StreamSummary duration={duration} onDashboard={()=>setState('setup')} onRestart={()=>{setSeconds(0);setConfig(initialConfig);setState('setup')}}/>
-  if(state==='setup'||state==='countdown')return <PreStreamSetup config={config} setConfig={setConfig} countdown={state==='countdown'?count:null} start={()=>{setCount(3);setState('countdown')}}/>
-  return <div className="page live-studio-page">
-    <div className="studio-heading"><div><span className="section-kicker">CREATOR STUDIO</span><h1>You’re live, Njeri.</h1><p>Everything you need to run the stream is right here.</p></div><button className="studio-chat-toggle" onClick={()=>setChatOpen(!chatOpen)}>{chatOpen?<ChevronRight/>:<ChevronLeft/>}{chatOpen?'Collapse chat':'Show chat'}</button></div>
-    <StreamStatusBar duration={duration}/>
-    <div className={chatOpen?'live-studio-layout':'live-studio-layout chat-collapsed'}>
-      <div className="studio-main"><StudioPreview duration={duration}/><StreamControls openSettings={()=>setDrawer('settings')} openChat={()=>setDrawer('moderation')} openAd={()=>setAdOpen(true)} end={()=>setEndOpen(true)}/></div>
-      {chatOpen&&<LiveStudioChat toast={toast}/>} 
+export function GoLivePage() {
+  const { user } = useAuth();
+  const { channel } = useCreator();
+  const [stream, setStream] = useState<PublicStream | null>(null);
+  const [configuration, setConfiguration] = useState<StreamingConfiguration | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    Promise.all([streamsApi.current(), streamsApi.configuration()])
+      .then(([current, config]) => {
+        setStream(current.stream);
+        setConfiguration(config.streaming);
+      })
+      .catch((reason) => setError(reason instanceof Error ? reason.message : "Could not load Creator Studio"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function act(action: () => Promise<{ stream: PublicStream }>) {
+    setBusy(true);
+    setError("");
+    try {
+      setStream((await action()).stream);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The stream could not be updated");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) return <div className="auth-loading">Loading Creator Studio…</div>;
+  if (!stream || stream.status === "CANCELLED" || stream.status === "FAILED") {
+    return (
+      <PrepareStream
+        error={error}
+        busy={busy}
+        onPrepare={(input) => act(() => streamsApi.prepare(input))}
+      />
+    );
+  }
+  if (stream.status === "ENDED") {
+    return <EndedStream stream={stream} onAnother={() => { setStream(null); setError(""); }} />;
+  }
+  return (
+    <div className="page live-studio-page real-stream-studio">
+      <div className="studio-heading">
+        <div>
+          <span className="section-kicker">CREATOR STUDIO · REAL STREAM RECORD</span>
+          <h1>{stream.status === "LIVE" ? `You’re live, ${user?.displayName}.` : "Waiting for broadcast"}</h1>
+          <p>{stream.status === "LIVE" ? "The provider has reported this broadcast active." : "Your stream is prepared. It will not become live until the provider reports an active broadcast."}</p>
+        </div>
+        <span className={`stream-state-pill ${stream.status.toLowerCase()}`}><i /> {stream.status}</span>
+      </div>
+      {error && <div className="form-error" role="alert">{error}</div>}
+      <RealStatusBar stream={stream} />
+      <div className="live-studio-layout">
+        <main className="studio-main">
+          <RealStudioPreview stream={stream} channelName={channel?.name ?? "Your channel"} />
+          <div className="studio-controls real-studio-controls">
+            {stream.status === "PREPARING" && (
+              <button className="end-control" disabled={busy} onClick={() => act(streamsApi.cancel)}><X /> Cancel prepared stream</button>
+            )}
+            {stream.status === "LIVE" && configuration?.developmentSimulationAvailable && (
+              <button className="end-control" disabled={busy} onClick={() => act(streamsApi.simulateEnd)}><Square /> Simulate Stream End</button>
+            )}
+          </div>
+        </main>
+        <aside className="studio-live-chat stage-placeholder">
+          <header><div><Shield /> LIVE CHAT</div></header>
+          <div><Shield /><h3>Chat is not connected yet</h3><p>Real chat and WebSockets are intentionally outside Stage 5A. No fictional messages are attached to this real stream.</p></div>
+        </aside>
+      </div>
+      {configuration?.developmentSimulationAvailable && (
+        <section className="development-controls panel">
+          <div><Code2 /><div><span className="section-kicker">DEVELOPMENT STREAMING CONTROLS</span><h2>Mock provider · no video delivery</h2><p>This deterministic control is available only in non-production mock mode.</p></div></div>
+          {stream.status === "PREPARING" && <button className="btn btn-accent" disabled={busy} onClick={() => act(streamsApi.simulateLive)}><Radio /> Simulate Go Live</button>}
+          {stream.status === "LIVE" && <button className="btn btn-muted" disabled={busy} onClick={() => act(streamsApi.simulateEnd)}><Square /> Simulate End</button>}
+        </section>
+      )}
+      <StreamInformation stream={stream} busy={busy} onSaved={(next) => act(() => streamsApi.update(next))} />
     </div>
-    <div className="studio-lower"><CurrentStreamInfo config={config} edit={()=>setDrawer('settings')}/><CreatorActivity/></div>
-    <StreamSettingsDrawer open={drawer==='settings'} close={()=>setDrawer(null)} config={config} save={next=>{setConfig(next);setDrawer(null);toast('Live stream settings updated')}}/>
-    <ChatModerationDrawer open={drawer==='moderation'} close={()=>setDrawer(null)} config={config} setConfig={setConfig}/>
-    <AdBreakModal open={adOpen} close={()=>setAdOpen(false)} run={length=>{toast(`${length}-second demo ad break started`);setAdOpen(false)}}/>
-    <EndStreamModal open={endOpen} close={()=>setEndOpen(false)} confirm={()=>{addPastStream({id:`past-live-${Date.now()}`,creatorId:'code-njeri',title:config.title,description:'A newly completed Jukwaa Live demo broadcast.',date:'18 Jul 2026',dateValue:'2026-07-18',startTime:'Now',duration,durationMinutes:Math.max(1,Math.ceil(seconds/60)),category:config.category,language:config.language,tags:config.tags.split(',').map(x=>x.trim()),views:1842,uniqueViewers:1380,peakViewers:263,averageViewers:184,followersGained:38,chatMessages:427,visibility:'PUBLIC',monetised:true,adRevenue:680,mpesaSupport:4250,accent:'#31b7ff'});setEndOpen(false);setState('summary');toast('Completed stream added to Creator Content')}} duration={duration}/>
-  </div>
+  );
 }
 
-function PreStreamSetup({config,setConfig,countdown,start}:{config:StreamConfig;setConfig:(c:StreamConfig)=>void;countdown:number|null;start:()=>void}){return <div className="page"><PageTitle eyebrow="CREATOR STUDIO" title="Set the stage" text="Configure your demo stream. No camera or microphone will be accessed."/><div className="go-live-layout"><form className="setup-form" onSubmit={e=>e.preventDefault()}><Field label="Stream title"><input value={config.title} onChange={e=>setConfig({...config,title:e.target.value})}/></Field><div className="form-row"><Field label="Category"><select value={config.category} onChange={e=>setConfig({...config,category:e.target.value})}>{categories.map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Language"><select value={config.language} onChange={e=>setConfig({...config,language:e.target.value})}>{['English','Kiswahili','Sheng','Kikuyu','Luo'].map(x=><option key={x}>{x}</option>)}</select></Field></div><Field label="Tags"><input value={config.tags} onChange={e=>setConfig({...config,tags:e.target.value})}/></Field><Toggle label="Mature content" detail="Mark this stream for adult audiences" checked={config.mature} onChange={v=>setConfig({...config,mature:v})}/><Field label="Chat permissions"><select value={config.chatMode} onChange={e=>setConfig({...config,chatMode:e.target.value})}><option>Everyone</option><option>Followers only</option><option disabled>Subscribers only — Coming soon</option></select></Field><Field label="Stream quality"><select value={config.quality} onChange={e=>setConfig({...config,quality:e.target.value})}><option>720p · Recommended</option><option>480p · Data saver</option><option>360p</option></select></Field></form><div><div className={`stream-preview ${countdown?'countdown-state':'ready'}`}><Radio/>{countdown?<><strong className="countdown">{countdown}</strong><span>Going live…</span></>:<><b>Your stage is ready</b><span>Preview appears here</span><small>720p · Low latency · Demo only</small></>}</div><button className="btn btn-accent full big" disabled={countdown!==null} onClick={start}>{countdown?'Starting stream…':'Start Stream'}</button><p className="demo-note">Simulation only. Nothing is broadcast or recorded.</p></div></div></div>}
+function PrepareStream({ error, busy, onPrepare }: { error: string; busy: boolean; onPrepare: (input: StreamInput) => void }) {
+  const [form, setForm] = useState(initialInput);
+  const [tags, setTags] = useState("");
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    onPrepare({ ...form, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean) });
+  }
+  return (
+    <div className="page">
+      <PageTitle eyebrow="CREATOR STUDIO" title="Prepare your stream" text="Create a real broadcast record first. Jukwaa waits for the configured provider before marking it live." />
+      <div className="go-live-layout">
+        <form className="setup-form" onSubmit={submit}>
+          {error && <div className="form-error" role="alert">{error}</div>}
+          <Field label="Stream title"><input required minLength={3} maxLength={140} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="What are you streaming today?" /></Field>
+          <Field label="Description (optional)"><textarea maxLength={1000} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Give viewers a little more context." /></Field>
+          <div className="form-row">
+            <Field label="Category"><select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></Field>
+            <Field label="Language"><select value={form.language} onChange={(event) => setForm({ ...form, language: event.target.value })}>{["English", "Kiswahili", "Sheng", "Kikuyu", "Luo", "Kalenjin", "Other"].map((language) => <option key={language}>{language}</option>)}</select></Field>
+          </div>
+          <Field label="Tags"><input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="Nairobi, Coding, Careers" /><small>Up to 10 comma-separated tags.</small></Field>
+          <label className="studio-toggle"><span><b>Mature content</b><small>Mark this stream for adult audiences.</small></span><input type="checkbox" role="switch" checked={form.matureContent} onChange={(event) => setForm({ ...form, matureContent: event.target.checked })} /></label>
+          <button className="btn btn-accent full big" disabled={busy}>{busy ? "Preparing…" : "Prepare Stream"}</button>
+        </form>
+        <div>
+          <div className="stream-preview ready real-prepare-preview"><Radio /><b>Provider-controlled lifecycle</b><span>PREPARING → LIVE → ENDED</span><small>The mock provider simulates status only. It does not deliver video.</small></div>
+          <p className="demo-note">No camera, microphone, payment service, or cloud streaming account is used.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-function StreamStatusBar({duration}:{duration:string}){const items=[['Stream duration',duration],['Viewers','247'],['Stream health','Excellent'],['Bitrate','4.5 Mbps'],['Resolution','720p'],['Dropped frames','0.2%']];return <section className="studio-status"><strong><i/> LIVE</strong>{items.map(([label,value])=><div key={label}><span>{label}</span><b>{value}</b></div>)}</section>}
-function StudioPreview({duration}:{duration:string}){return <div className="studio-preview"><div className="studio-preview-top"><span><i/> LIVE</span><span><Users/>247</span></div><div className="studio-signal"><Radio/><b>JUKWAA LIVE</b><small>Creator preview · {duration}</small></div><div className="studio-preview-bottom"><span><Volume2/> Audio active</span><span>720p · 4.5 Mbps</span></div></div>}
-function StreamControls({openSettings,openChat,openAd,end}:{openSettings:()=>void;openChat:()=>void;openAd:()=>void;end:()=>void}){const {toast}=useApp();return <div className="studio-controls"><span><Headphones/> Audio <i className="good"/></span><span><Mic/> Microphone <i className="good"/></span><button onClick={openSettings}><Settings/> Stream Settings</button><button onClick={openChat}><MessageSquare/> Manage Chat</button><button onClick={openAd}><Zap/> Run Ad</button><button onClick={()=>toast('Stream link copied')}><Share2/> Share Stream</button><button className="end-control" onClick={end}>End Stream</button></div>}
+function RealStatusBar({ stream }: { stream: PublicStream }) {
+  const duration = useDuration(stream.startedAt, stream.endedAt);
+  const items = [
+    ["Stream state", stream.status], ["Duration", duration], ["Provider", stream.playback?.provider ?? "mock"],
+    ["Viewers", "Not tracked"], ["Health", "Not available"], ["Recording", "Not available"],
+  ];
+  return <section className="studio-status"><strong><i /> {stream.status}</strong>{items.map(([label, value]) => <div key={label}><span>{label}</span><b>{value}</b></div>)}</section>;
+}
 
-function LiveStudioChat({toast}:{toast:(s:string)=>void}){const seed:StudioMessage[]=chatMessages.slice(0,16).map((m,i)=>({...m,time:`20:${String(14+i).padStart(2,'0')}`}));seed[2]={id:903,user:'CodeWithNjeri',text:'Drop your React questions below — tutazijibu live!',badge:'CREATOR',time:'20:16'};const [messages,setMessages]=useState(seed),[text,setText]=useState(''),[pinned,setPinned]=useState(seed[2]),[menu,setMenu]=useState<number|null>(null);const ref=useRef<HTMLDivElement>(null);useEffect(()=>{if(ref.current)ref.current.scrollTop=ref.current.scrollHeight},[messages]);const send=()=>{if(!text.trim())return;setMessages(x=>[...x,{id:Date.now(),user:'CodeWithNjeri',text:text.trim(),badge:'CREATOR',time:'Now'}]);setText('')};return <aside className="studio-live-chat"><header><div><i/> LIVE CHAT <span>Slow mode · 5s</span></div><button aria-label="Chat settings" onClick={()=>toast('Open Manage Chat for full controls')}><Settings/></button></header>{pinned&&<div className="studio-pinned"><Pin/><div><span>PINNED MESSAGE</span><p><b>{pinned.user}:</b> {pinned.text}</p></div></div>}<div className="studio-messages" ref={ref}>{messages.map(m=><div className="studio-message" key={m.id}><span className="message-time">{m.time}</span><p>{m.badge&&<small className={`studio-badge ${m.badge.toLowerCase()}`}>{m.badge}</small>}<b>{m.user}</b> {m.text}</p><div className="message-actions"><button aria-label={`Moderate ${m.user}`} onClick={()=>setMenu(menu===m.id?null:m.id)}><Ellipsis/></button>{menu===m.id&&<div><button onClick={()=>{setMessages(x=>x.filter(x=>x.id!==m.id));setMenu(null)}}><Trash2/> Delete message</button><button onClick={()=>{toast(`${m.user} timed out for 10 minutes`);setMenu(null)}}><UserRoundX/> Timeout user</button><button onClick={()=>{toast(`${m.user} banned in demo mode`);setMenu(null)}}><Ban/> Ban user</button><button onClick={()=>{setPinned(m);setMenu(null)}}><Pin/> Pin message</button></div>}</div></div>)}</div><div className="studio-chat-input"><div><button aria-label="Emoji" onClick={()=>setText(x=>x+'🔥')}><Smile/></button><input aria-label="Creator chat message" placeholder="Reply as creator…" value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()}/><button aria-label="Send" onClick={send}><Send/></button></div><small>Posting as CodeWithNjeri · Creator</small></div></aside>}
+function RealStudioPreview({ stream, channelName }: { stream: PublicStream; channelName: string }) {
+  return <div className="studio-preview real-provider-preview"><div className="studio-preview-top"><span><i /> {stream.status}</span></div><div className="studio-signal"><Radio /><b>{channelName}</b><small>{stream.status === "PREPARING" ? "Waiting for broadcasting software" : "Development livestream simulation · no video"}</small></div></div>;
+}
 
-function CurrentStreamInfo({config,edit}:{config:StreamConfig;edit:()=>void}){return <section className="current-stream-info"><header><div><span className="section-kicker">CURRENT BROADCAST</span><h2>Stream information</h2></div><button className="btn btn-muted" onClick={edit}><Settings/> Edit Stream Info</button></header><h3>{config.title}</h3><dl><div><dt>Category</dt><dd>{config.category}</dd></div><div><dt>Language</dt><dd>{config.language}</dd></div><div><dt>Tags</dt><dd>{config.tags}</dd></div><div><dt>Visibility</dt><dd>Public</dd></div><div><dt>Started</dt><dd>Today, 8:04 PM EAT</dd></div></dl></section>}
-function CreatorActivity(){return <section className="creator-activity"><span className="section-kicker">REALTIME</span><h2>Creator activity</h2><div>{activity.map((x,i)=><p key={x}><i className={i===1||i===4?'amber':''}/><span>{x}</span><small>{i+1}m ago</small></p>)}</div></section>}
+function StreamInformation({ stream, busy, onSaved }: { stream: PublicStream; busy: boolean; onSaved: (input: Partial<StreamInput>) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(stream.title);
+  const [description, setDescription] = useState(stream.description ?? "");
+  if (editing) return <section className="current-stream-info"><header><div><span className="section-kicker">CURRENT BROADCAST</span><h2>Edit stream information</h2></div></header><div className="stream-inline-edit"><Field label="Title"><input value={title} onChange={(event) => setTitle(event.target.value)} /></Field><Field label="Description"><textarea value={description} onChange={(event) => setDescription(event.target.value)} /></Field><button className="btn btn-accent" disabled={busy} onClick={() => { onSaved({ title, description }); setEditing(false); }}><Save /> Save changes</button></div></section>;
+  return <section className="current-stream-info"><header><div><span className="section-kicker">CURRENT BROADCAST</span><h2>Stream information</h2></div><button className="btn btn-muted" onClick={() => setEditing(true)}>Edit</button></header><h3>{stream.title}</h3>{stream.description && <p>{stream.description}</p>}<dl><div><dt>Category</dt><dd>{stream.category}</dd></div><div><dt>Language</dt><dd>{stream.language}</dd></div><div><dt>Tags</dt><dd>{stream.tags.join(", ") || "None"}</dd></div><div><dt>Mature</dt><dd>{stream.matureContent ? "Yes" : "No"}</dd></div><div><dt>Created</dt><dd>{new Date(stream.createdAt).toLocaleString()}</dd></div></dl></section>;
+}
 
-function DrawerShell({open,title,close,children,footer}:{open:boolean;title:string;close:()=>void;children:ReactNode;footer?:ReactNode}){if(!open)return null;return <div className="drawer-backdrop" onMouseDown={e=>e.target===e.currentTarget&&close()}><aside className="studio-drawer" role="dialog" aria-modal="true" aria-label={title}><header><h2>{title}</h2><button aria-label="Close drawer" onClick={close}><X/></button></header><div className="drawer-body">{children}</div>{footer&&<footer>{footer}</footer>}</aside></div>}
-function StreamSettingsDrawer({open,close,config,save}:{open:boolean;close:()=>void;config:StreamConfig;save:(c:StreamConfig)=>void}){const [draft,setDraft]=useState(config);useEffect(()=>{if(open)setDraft(config)},[open,config]);return <DrawerShell open={open} title="Stream Settings" close={close} footer={<button className="btn btn-accent full" onClick={()=>save(draft)}>Save Changes</button>}><DrawerSection title="Stream info"><Field label="Stream title"><input value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})}/></Field><div className="form-row"><Field label="Category"><select value={draft.category} onChange={e=>setDraft({...draft,category:e.target.value})}>{categories.map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Language"><select value={draft.language} onChange={e=>setDraft({...draft,language:e.target.value})}>{['English','Kiswahili','Sheng'].map(x=><option key={x}>{x}</option>)}</select></Field></div><Field label="Tags"><input value={draft.tags} onChange={e=>setDraft({...draft,tags:e.target.value})}/></Field></DrawerSection><DrawerSection title="Chat settings"><Field label="Who can chat"><select value={draft.chatMode} onChange={e=>setDraft({...draft,chatMode:e.target.value})}><option>Everyone</option><option>Followers only</option></select></Field><Toggle label="Slow mode" detail={`${draft.slowInterval} second interval`} checked={draft.slowMode} onChange={v=>setDraft({...draft,slowMode:v})}/><Field label="Slow-mode interval"><select value={draft.slowInterval} onChange={e=>setDraft({...draft,slowInterval:Number(e.target.value)})}>{[5,10,30,60].map(x=><option value={x} key={x}>{x} seconds</option>)}</select></Field><Field label="Blocked words"><input value={draft.blockedWords} onChange={e=>setDraft({...draft,blockedWords:e.target.value})}/></Field></DrawerSection><DrawerSection title="Content settings"><Toggle label="Mature content" detail="Audience label updates immediately" checked={draft.mature} onChange={v=>setDraft({...draft,mature:v})}/></DrawerSection><DrawerSection title="Stream settings"><Field label="Selected quality"><select disabled value={draft.quality}><option>{draft.quality}</option></select><small>Available after ending the current stream.</small></Field><Field label="Latency mode"><select value={draft.latency} onChange={e=>setDraft({...draft,latency:e.target.value})}><option>Low latency</option><option>Normal latency</option></select></Field><Toggle label="Automatic quality" detail="Adapt quality to connection health" checked={draft.autoQuality} onChange={v=>setDraft({...draft,autoQuality:v})}/><Field label="Automatic ad breaks"><select value={draft.autoAds} onChange={e=>setDraft({...draft,autoAds:e.target.value})}>{['Off','Every 30 minutes','Every 45 minutes','Every 60 minutes'].map(x=><option key={x}>{x}</option>)}</select></Field></DrawerSection></DrawerShell>}
+function EndedStream({ stream, onAnother }: { stream: PublicStream; onAnother: () => void }) {
+  return <div className="page stream-summary"><span className="summary-icon"><CheckCircle2 /></span><span className="section-kicker">STREAM ENDED</span><h1>Broadcast complete.</h1><p>{stream.title} ended after {useDuration(stream.startedAt, stream.endedAt)}. No recording or fabricated analytics were created.</p><div className="summary-actions"><Link className="btn btn-muted" to="/dashboard">Return to Creator Dashboard</Link><button className="btn btn-accent" onClick={onAnother}><Radio /> Prepare Another Stream</button></div></div>;
+}
 
-function ChatModerationDrawer({open,close,config,setConfig}:{open:boolean;close:()=>void;config:StreamConfig;setConfig:(c:StreamConfig)=>void}){const [words,setWords]=useState(config.blockedWords),[banned,setBanned]=useState(['SpamBotKE']),[timedOut,setTimedOut]=useState(['SupaStrika']);const {toast}=useApp();const addWord=()=>{const word=prompt('Add a blocked word');if(word)setWords(x=>x?`${x}, ${word}`:word)};return <DrawerShell open={open} title="Manage Chat" close={close}><DrawerSection title="Chat mode"><div className="mode-options">{['Everyone','Followers only','Subscribers only — Coming soon'].map(x=><button disabled={x.includes('Coming')} className={config.chatMode===x?'active':''} onClick={()=>setConfig({...config,chatMode:x})} key={x}>{x}</button>)}</div><Toggle label="Slow mode" detail={`${config.slowInterval} seconds between messages`} checked={config.slowMode} onChange={v=>setConfig({...config,slowMode:v})}/></DrawerSection><DrawerSection title="Blocked words"><div className="chip-list">{words.split(',').filter(Boolean).map(x=><button key={x} onClick={()=>setWords(words.split(',').filter(w=>w.trim()!==x.trim()).join(','))}>{x.trim()} <X/></button>)}</div><button className="btn btn-muted" onClick={addWord}>Add blocked word</button></DrawerSection><UserList title="Moderators" users={['NjeriN','ModWaMtaa']} action="Remove" onAction={u=>toast(`${u} removed as moderator`)}/><UserList title="Banned users" users={banned} action="Unban" onAction={u=>setBanned(x=>x.filter(v=>v!==u))}/><UserList title="Timed-out users" users={timedOut} action="Remove timeout" onAction={u=>setTimedOut(x=>x.filter(v=>v!==u))}/><button className="btn danger full" onClick={()=>toast('Live chat cleared in demo mode')}><Trash2/> Clear Chat</button></DrawerShell>}
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="studio-field"><span>{label}</span>{children}</label>;
+}
 
-function AdBreakModal({open,close,run}:{open:boolean;close:()=>void;run:(n:number)=>void}){const [length,setLength]=useState(30);return <Modal open={open} onClose={close} title="Run an ad break"><p className="modal-copy">Choose the length of this demo ad break.</p><div className="ad-lengths">{[30,60,90].map(x=><button className={length===x?'active':''} onClick={()=>setLength(x)} key={x}>{x}<small>seconds</small></button>)}</div><p className="ad-viewers"><Users/> Estimated viewers: <b>247</b></p><button className="btn btn-accent full" onClick={()=>run(length)}>Run {length}-second ad</button><p className="demo-note">Demo only. No real advertisement will be served.</p></Modal>}
-function EndStreamModal({open,close,confirm,duration}:{open:boolean;close:()=>void;confirm:()=>void;duration:string}){return <Modal open={open} onClose={close} title="End your live stream?"><p className="modal-copy">Your broadcast will stop immediately for all viewers.</p><div className="end-stats"><div><span>Current duration</span><b>{duration}</b></div><div><span>Peak viewers</span><b>263</b></div><div><span>Current viewers</span><b>247</b></div></div><div className="modal-actions"><button className="btn btn-muted" onClick={close}>Cancel</button><button className="btn danger" onClick={confirm}>End Stream</button></div></Modal>}
-function StreamSummary({duration,onDashboard,onRestart}:{duration:string;onDashboard:()=>void;onRestart:()=>void}){const stats=[['Total stream duration',duration],['Peak concurrent viewers','263'],['Unique viewers','1,842'],['New followers','38'],['Chat messages','427'],['M-Pesa support','KES 4,250 · Demo'],['Estimated ad revenue','KES 680 · Demo']];return <div className="page stream-summary"><span className="summary-icon"><Shield/></span><span className="section-kicker">STREAM COMPLETE</span><h1>Strong session, Njeri.</h1><p>Your demo broadcast has ended. Here’s how the stream performed.</p><div className="summary-grid">{stats.map(([label,value])=><div key={label}><span>{label}</span><b>{value}</b></div>)}</div><div className="summary-actions"><Link className="btn btn-muted" to="/dashboard" onClick={onDashboard}>Return to Creator Dashboard</Link><button className="btn btn-accent" onClick={onRestart}><Radio/> Start Another Stream</button></div></div>}
-
-function DrawerSection({title,children}:{title:string;children:ReactNode}){return <section className="drawer-section"><h3>{title}</h3>{children}</section>}
-function Field({label,children}:{label:string;children:ReactNode}){return <label className="studio-field"><span>{label}</span>{children}</label>}
-function Toggle({label,detail,checked,onChange}:{label:string;detail:string;checked:boolean;onChange:(v:boolean)=>void}){return <label className="studio-toggle"><span><b>{label}</b><small>{detail}</small></span><input type="checkbox" role="switch" checked={checked} onChange={e=>onChange(e.target.checked)}/></label>}
-function UserList({title,users,action,onAction}:{title:string;users:string[];action:string;onAction:(u:string)=>void}){return <DrawerSection title={title}>{users.length?users.map(u=><div className="moderation-user" key={u}><span><Heart/>{u}</span><button onClick={()=>onAction(u)}>{action}</button></div>):<p className="drawer-empty">No users here.</p>}</DrawerSection>}
-function formatDuration(seconds:number){return `${String(Math.floor(seconds/3600)).padStart(2,'0')}:${String(Math.floor(seconds/60)%60).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`}
+function useDuration(startedAt: string | null, endedAt: string | null) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!startedAt || endedAt) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [startedAt, endedAt]);
+  return useMemo(() => {
+    if (!startedAt) return "00:00:00";
+    const seconds = Math.max(0, Math.floor(((endedAt ? new Date(endedAt).getTime() : now) - new Date(startedAt).getTime()) / 1000));
+    return [Math.floor(seconds / 3600), Math.floor((seconds % 3600) / 60), seconds % 60].map((value) => String(value).padStart(2, "0")).join(":");
+  }, [startedAt, endedAt, now]);
+}

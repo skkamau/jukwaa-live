@@ -10,6 +10,9 @@ export interface EnvironmentVariables extends Record<string, unknown> {
   TRUST_PROXY: boolean;
   SESSION_TTL_DAYS: number;
   EMAIL_DELIVERY_MODE: 'console' | 'smtp';
+  STREAMING_PROVIDER: 'mock';
+  STREAM_STATUS_SYNC_SECONDS: number;
+  ALLOW_MOCK_STREAMING_IN_PRODUCTION: boolean;
 }
 
 const environmentSchema = Joi.object<EnvironmentVariables>({
@@ -26,6 +29,9 @@ const environmentSchema = Joi.object<EnvironmentVariables>({
   TRUST_PROXY: Joi.boolean().default(false),
   SESSION_TTL_DAYS: Joi.number().integer().min(1).max(365).default(30),
   EMAIL_DELIVERY_MODE: Joi.string().valid('console', 'smtp').default('console'),
+  STREAMING_PROVIDER: Joi.string().valid('mock').default('mock'),
+  STREAM_STATUS_SYNC_SECONDS: Joi.number().integer().min(2).max(300).default(10),
+  ALLOW_MOCK_STREAMING_IN_PRODUCTION: Joi.boolean().default(false),
   SMTP_HOST: Joi.when('EMAIL_DELIVERY_MODE', { is: 'smtp', then: Joi.string().required(), otherwise: Joi.string().optional() }),
   SMTP_PORT: Joi.number().port().default(587),
   SMTP_SECURE: Joi.boolean().default(false),
@@ -57,6 +63,26 @@ export function validateEnvironment(
 
   if (value.NODE_ENV === 'production' && value.EMAIL_DELIVERY_MODE === 'console') {
     throw new Error('Environment validation failed: EMAIL_DELIVERY_MODE=console is not allowed in production');
+  }
+
+  if (
+    value.NODE_ENV === 'production' &&
+    value.STREAMING_PROVIDER === 'mock' &&
+    config.STREAMING_PROVIDER !== 'mock'
+  ) {
+    throw new Error(
+      'Environment validation failed: STREAMING_PROVIDER must be explicitly set in production',
+    );
+  }
+
+  if (
+    value.NODE_ENV === 'production' &&
+    value.STREAMING_PROVIDER === 'mock' &&
+    value.ALLOW_MOCK_STREAMING_IN_PRODUCTION !== true
+  ) {
+    throw new Error(
+      'Environment validation failed: mock streaming in production requires ALLOW_MOCK_STREAMING_IN_PRODUCTION=true',
+    );
   }
 
   return value;
