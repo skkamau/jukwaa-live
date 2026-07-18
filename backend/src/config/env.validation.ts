@@ -6,6 +6,7 @@ export interface EnvironmentVariables extends Record<string, unknown> {
   NODE_ENV: NodeEnvironment;
   PORT: number;
   FRONTEND_ORIGIN: string;
+  DATABASE_URL: string;
 }
 
 const environmentSchema = Joi.object<EnvironmentVariables>({
@@ -16,6 +17,9 @@ const environmentSchema = Joi.object<EnvironmentVariables>({
   FRONTEND_ORIGIN: Joi.string()
     .uri({ scheme: ['http', 'https'] })
     .default('http://localhost:5173'),
+  DATABASE_URL: Joi.string()
+    .uri({ scheme: ['postgresql', 'postgres'] })
+    .required(),
 }).unknown(true);
 
 export function validateEnvironment(

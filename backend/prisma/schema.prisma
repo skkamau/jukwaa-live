@@ -1,0 +1,98 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  runtime      = "nodejs"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  VIEWER
+  MODERATOR
+  ADMIN
+  SUPER_ADMIN
+
+  @@map("user_role")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  DEACTIVATED
+
+  @@map("user_status")
+}
+
+enum CreatorStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+
+  @@map("creator_status")
+}
+
+enum ChannelStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+
+  @@map("channel_status")
+}
+
+model User {
+  id              String          @id @default(uuid()) @db.Uuid
+  email           String          @unique(map: "users_email_key") @db.VarChar(320)
+  username        String          @unique(map: "users_username_key") @db.VarChar(50)
+  displayName     String          @map("display_name") @db.VarChar(100)
+  avatarUrl       String?         @map("avatar_url") @db.VarChar(2048)
+  bio             String?         @db.VarChar(500)
+  role            UserRole        @default(VIEWER)
+  status          UserStatus      @default(ACTIVE)
+  emailVerifiedAt DateTime?       @map("email_verified_at") @db.Timestamptz(3)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt       DateTime?       @map("deleted_at") @db.Timestamptz(3)
+  creatorProfile  CreatorProfile?
+
+  @@index([status], map: "users_status_idx")
+  @@index([createdAt], map: "users_created_at_idx")
+  @@map("users")
+}
+
+model CreatorProfile {
+  id         String        @id @default(uuid()) @db.Uuid
+  userId     String        @unique(map: "creator_profiles_user_id_key") @map("user_id") @db.Uuid
+  status     CreatorStatus @default(PENDING)
+  verifiedAt DateTime?     @map("verified_at") @db.Timestamptz(3)
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  channel    Channel?
+
+  @@index([status], map: "creator_profiles_status_idx")
+  @@index([createdAt], map: "creator_profiles_created_at_idx")
+  @@map("creator_profiles")
+}
+
+model Channel {
+  id               String         @id @default(uuid()) @db.Uuid
+  creatorProfileId String         @unique(map: "channels_creator_profile_id_key") @map("creator_profile_id") @db.Uuid
+  slug             String         @unique(map: "channels_slug_key") @db.VarChar(80)
+  name             String         @db.VarChar(100)
+  description      String?        @db.VarChar(1000)
+  bannerUrl        String?        @map("banner_url") @db.VarChar(2048)
+  status           ChannelStatus  @default(ACTIVE)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt        DateTime?      @map("deleted_at") @db.Timestamptz(3)
+  creatorProfile   CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([status], map: "channels_status_idx")
+  @@index([createdAt], map: "channels_created_at_idx")
+  @@map("channels")
+}

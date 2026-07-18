@@ -7,6 +7,7 @@ import { configureApplication } from './app.setup';
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   configureApplication(app);
+  app.enableShutdownHooks();
 
   const configService = app.get(ConfigService);
   const environment = configService.getOrThrow<string>('app.environment');

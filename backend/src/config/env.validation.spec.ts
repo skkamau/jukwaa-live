@@ -6,6 +6,7 @@ describe('validateEnvironment', () => {
       NODE_ENV: 'test',
       PORT: '3001',
       FRONTEND_ORIGIN: 'http://localhost:5173',
+      DATABASE_URL: 'postgresql://test:test@localhost:5432/jukwaa_test',
     });
 
     expect(result).toEqual(
@@ -13,6 +14,7 @@ describe('validateEnvironment', () => {
         NODE_ENV: 'test',
         PORT: 3001,
         FRONTEND_ORIGIN: 'http://localhost:5173',
+        DATABASE_URL: 'postgresql://test:test@localhost:5432/jukwaa_test',
       }),
     );
   });
@@ -23,13 +25,26 @@ describe('validateEnvironment', () => {
         NODE_ENV: 'staging',
         PORT: 'invalid',
         FRONTEND_ORIGIN: '*',
+        DATABASE_URL: 'not-a-postgres-url',
       }),
     ).toThrow('Environment validation failed');
   });
 
   it('requires an explicit production frontend origin', () => {
-    expect(() => validateEnvironment({ NODE_ENV: 'production' })).toThrow(
-      'FRONTEND_ORIGIN is required in production',
-    );
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'production',
+        DATABASE_URL: 'postgresql://test:test@localhost:5432/jukwaa_test',
+      }),
+    ).toThrow('FRONTEND_ORIGIN is required in production');
+  });
+
+  it('requires a PostgreSQL database URL', () => {
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'test',
+        FRONTEND_ORIGIN: 'http://localhost:5173',
+      }),
+    ).toThrow('DATABASE_URL');
   });
 });
