@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider, ProtectedRoute } from "./auth";
+import { CreatorProvider, CreatorRoute } from "./creator";
 import { Layout } from "./components";
 import { AppProvider } from "./context";
 import { EarningsPage, SettingsPage } from "./pages/account";
@@ -25,6 +26,7 @@ import {
 import { GoLivePage } from "./pages/liveStudio";
 import { DashboardPage } from "./pages/studio";
 import { WatchPage } from "./pages/watch";
+import { ChannelPage } from "./pages/channel";
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -57,7 +59,8 @@ export default function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
-          <AppProvider>
+          <CreatorProvider>
+            <AppProvider>
             <Layout>
               <Routes>
                 <Route path="/" element={<HomePage />} />
@@ -69,6 +72,7 @@ export default function App() {
                 />
                 <Route path="/watch/:streamId" element={<WatchPage />} />
                 <Route path="/creator/:creatorId" element={<CreatorPage />} />
+                <Route path="/channel/:slug" element={<ChannelPage />} />
                 <Route path="/clips" element={<ClipsPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
@@ -86,15 +90,15 @@ export default function App() {
                 />
                 <Route
                   path="/dashboard/content"
-                  element={protectedPage(<CreatorContentPage />)}
+                  element={protectedPage(<CreatorRoute><CreatorContentPage /></CreatorRoute>)}
                 />
                 <Route
                   path="/dashboard/content/:streamId"
-                  element={protectedPage(<PastStreamDetails />)}
+                  element={protectedPage(<CreatorRoute><PastStreamDetails /></CreatorRoute>)}
                 />
                 <Route
                   path="/dashboard/analytics"
-                  element={protectedPage(<AnalyticsPage />)}
+                  element={protectedPage(<CreatorRoute><AnalyticsPage /></CreatorRoute>)}
                 />
                 <Route
                   path="/wallet"
@@ -106,12 +110,13 @@ export default function App() {
                 />
                 <Route
                   path="/go-live"
-                  element={protectedPage(<GoLivePage />)}
+                  element={protectedPage(<CreatorRoute><GoLivePage /></CreatorRoute>)}
                 />
                 <Route path="*" element={<HomePage />} />
               </Routes>
             </Layout>
-          </AppProvider>
+            </AppProvider>
+          </CreatorProvider>
         </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>

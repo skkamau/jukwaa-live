@@ -1,6 +1,6 @@
 # Jukwaa Live
 
-**Kenya is live.** Jukwaa Live is a Kenyan-first livestreaming platform prototype. Stage 3 adds real email/password authentication while preserving the existing fictional streams, creators, clips, chat, analytics, earnings, and studio experiences as demo content.
+**Kenya is live.** Jukwaa Live is a Kenyan-first livestreaming platform prototype. Stage 4 adds real user profiles, creator onboarding, owned channels, and public channel pages while preserving fictional streams, creators, clips, chat, analytics, and earnings as demo content.
 
 ## Technology
 
@@ -32,7 +32,7 @@ npm run dev
 
 Open `http://localhost:5173`. The frontend uses `VITE_API_BASE_URL` (default `http://localhost:3000/api/v1`) and sends cookies with `credentials: "include"`. No backend secret belongs in a `VITE_*` variable.
 
-Register at `/register`. In development console-email mode, copy the clearly labelled verification or reset URL from the backend terminal. Authentication persists through the `jukwaa_session` HttpOnly cookie; it is never stored in localStorage or exposed to React.
+Register at `/register`. In development console-email mode, copy the clearly labelled verification URL from the backend terminal. After verification, open `/dashboard` to create a unique channel. Real channels use `/channel/:slug`; profile and channel details can be edited in `/settings`.
 
 ## Quality checks
 
@@ -50,6 +50,6 @@ npm run build
 
 Real database integration tests require migrated PostgreSQL and `RUN_DATABASE_INTEGRATION_TESTS=true`; see [backend/README.md](backend/README.md).
 
-## Stage 3 scope
+## Stage 4 scope
 
-Real account registration, login, current-user session restoration, logout, logout-all, email verification, forgot/reset password, and authentication rate limiting are implemented. Creator onboarding, real streaming/chat/follows/analytics, OAuth, 2FA, M-Pesa, payments, ads, monetisation, and payouts are intentionally deferred.
+Real account authentication, editable profiles, verified-user creator onboarding, creator/channel ownership, creator zero states, and public channel lookup are implemented. Usernames and channel slugs are read-only after creation. Real streaming/chat/follows/analytics, OAuth, 2FA, M-Pesa, payments, ads, monetisation, and payouts are intentionally deferred.

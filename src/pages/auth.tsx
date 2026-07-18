@@ -423,6 +423,7 @@ export function ResetPasswordPage() {
 }
 
 export function VerifyEmailPage() {
+  const { refresh } = useAuth();
   const [params] = useSearchParams(),
     registered = params.get("registered") === "1",
     email = params.get("email") ?? "",
@@ -444,12 +445,15 @@ export function VerifyEmailPage() {
     }
     authApi
       .verifyEmail(token)
-      .then(() => setState("done"))
+      .then(async () => {
+        await refresh();
+        setState("done");
+      })
       .catch((reason) => {
         setState("error");
         setError(messageOf(reason));
       });
-  }, [params, registered]);
+  }, [params, registered, refresh]);
   const resend = async () => {
     if (!email) return;
     await authApi.resendVerification(email);

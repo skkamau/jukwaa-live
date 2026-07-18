@@ -12,6 +12,9 @@ import { money, transactions } from "../data";
 import { FilterChips, Modal } from "../components";
 import { useApp } from "../context";
 import { useAuth } from "../auth";
+import { useCreator } from "../creator";
+import { profilesApi, type Channel } from "../api/profiles";
+import type { AuthUser } from "../api/auth";
 import { PageTitle } from "./discovery";
 
 export function EarningsPage() {
@@ -115,7 +118,8 @@ export function EarningsPage() {
 
 export function SettingsPage() {
   const { appearance, setAppearance, lowData, setLowData, toast } = useApp();
-  const { user, logoutAll } = useAuth();
+  const { user, logoutAll, refresh } = useAuth();
+  const { creator, channel, updateChannel } = useCreator();
   const [autoplay, setAutoplay] = useState(true),
     [del, setDel] = useState(false);
   return (
@@ -129,6 +133,7 @@ export function SettingsPage() {
         <nav>
           {[
             "Profile",
+            ...(channel ? ["Channel"] : []),
             "Stream preferences",
             "Notifications",
             "Language",
@@ -166,14 +171,19 @@ export function SettingsPage() {
                 </span>
               </div>
             </div>
+            {user && <ProfileEditor user={user} onSaved={refresh} toast={toast} />}
             <p className="identity-note">
-              Profile editing will arrive in a later stage. Your authenticated
-              account details are shown here read-only.
+              Username and email remain read-only in this stage.
             </p>
             <button className="btn btn-muted" onClick={() => logoutAll()}>
               Sign out on all devices
             </button>
           </SettingSection>
+          {channel && creator && (
+            <SettingSection title="Channel" id="channel">
+              <ChannelEditor channel={channel} updateChannel={updateChannel} toast={toast} />
+            </SettingSection>
+          )}
           <SettingSection title="Stream preferences" id="stream-preferences">
             <Toggle
               label="Autoplay live streams"
@@ -296,6 +306,51 @@ export function SettingsPage() {
     </div>
   );
 }
+
+function ProfileEditor({ user, onSaved, toast }: { user: AuthUser; onSaved: () => Promise<void>; toast: (text: string) => void }) {
+  const [form, setForm] = useState({
+    displayName: user.displayName,
+    bio: user.bio ?? "",
+    avatarUrl: user.avatarUrl ?? "",
+  });
+  const [saving, setSaving] = useState(false), [error, setError] = useState("");
+  async function save(event: React.FormEvent) {
+    event.preventDefault(); setSaving(true); setError("");
+    try {
+      await profilesApi.updateMe(form);
+      await onSaved();
+      toast("Profile updated");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not update profile");
+    } finally { setSaving(false); }
+  }
+  return <form className="settings-edit-form" onSubmit={save}>
+    {error && <div className="form-error" role="alert">{error}</div>}
+    <label>Display name<input value={form.displayName} onChange={(event) => setForm(current => ({ ...current, displayName: event.target.value }))} maxLength={100} required /></label>
+    <label>Bio<textarea value={form.bio} onChange={(event) => setForm(current => ({ ...current, bio: event.target.value }))} maxLength={500} placeholder="Tell the Jukwaa community about yourself." /></label>
+    <label>Avatar image URL <span>Optional</span><input type="url" value={form.avatarUrl} onChange={(event) => setForm(current => ({ ...current, avatarUrl: event.target.value }))} maxLength={2048} placeholder="https://example.com/avatar.jpg" /></label>
+    <button className="btn btn-accent" disabled={saving}>{saving ? "Saving…" : "Save profile"}</button>
+  </form>;
+}
+
+function ChannelEditor({ channel, updateChannel, toast }: { channel: Channel; updateChannel: (data: { name?: string; description?: string }) => Promise<void>; toast: (text: string) => void }) {
+  const [form, setForm] = useState({ name: channel.name, description: channel.description ?? "" });
+  const [saving, setSaving] = useState(false), [error, setError] = useState("");
+  async function save(event: React.FormEvent) {
+    event.preventDefault(); setSaving(true); setError("");
+    try { await updateChannel(form); toast("Channel updated"); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Could not update channel"); }
+    finally { setSaving(false); }
+  }
+  return <form className="settings-edit-form" onSubmit={save}>
+    {error && <div className="form-error" role="alert">{error}</div>}
+    <label>Channel name<input value={form.name} onChange={(event) => setForm(current => ({ ...current, name: event.target.value }))} maxLength={100} required /></label>
+    <label>Channel description<textarea value={form.description} onChange={(event) => setForm(current => ({ ...current, description: event.target.value }))} maxLength={1000} /></label>
+    <div className="readonly-channel-url"><span>Channel URL</span><b>jukwaa.live/channel/{channel.slug}</b><small>Channel URLs are read-only for link stability.</small></div>
+    <button className="btn btn-accent" disabled={saving}>{saving ? "Saving…" : "Save channel"}</button>
+  </form>;
+}
+
 function SettingSection({
   title,
   id,

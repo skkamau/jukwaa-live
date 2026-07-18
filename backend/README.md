@@ -2,6 +2,8 @@
 
 NestJS, Prisma, and PostgreSQL API for Jukwaa Live. Stage 3 implements public email/password authentication with database-backed opaque sessions.
 
+Stage 4 adds authenticated user profiles, verified-user creator onboarding, owned channel editing, and safe public channel lookup. The existing `User`, `CreatorProfile`, and `Channel` schema already enforces one creator profile per user and one channel per creator, so Stage 4 requires no database migration.
+
 ## Authentication architecture
 
 - Passwords are hashed by a dedicated service with Argon2id (`memoryCost=19456 KiB`, `timeCost=2`, `parallelism=1`). Passwords are 12–128 characters, are never trimmed, and are never logged or serialized.
@@ -30,8 +32,16 @@ All routes use the `/api/v1` prefix.
 | POST | `/auth/email/verify` | Consume a verification token transactionally |
 | POST | `/auth/password/forgot` | Send a reset link with the same response for known/unknown email |
 | POST | `/auth/password/reset` | Consume a reset token, update password, and revoke sessions |
+| GET | `/users/me` | Read the authenticated user profile |
+| PATCH | `/users/me` | Update display name, bio, and optional URL avatar |
+| GET | `/creators/me` | Read the authenticated user's creator/channel state |
+| POST | `/creators/me` | Atomically create one creator profile and channel |
+| PATCH | `/creators/me/channel` | Update the owner's channel name and description |
+| GET | `/channels/:slug` | Read safe public information for an active channel |
 
 Login failures are generic. Safe user responses omit password/session/token hashes and all raw secrets.
+
+Creator onboarding requires an active, non-deleted, email-verified user. Slugs are normalized lowercase URL-safe values containing letters, numbers, and single hyphens. System routes including `admin`, `api`, `login`, `register`, `settings`, `dashboard`, `browse`, `following`, `clips`, `go-live`, `wallet`, `earnings`, `support`, `help`, `moderation`, `creator`, `channel`, `watch`, and authentication routes are reserved. Slugs remain read-only after creation for link stability.
 
 ## Environment
 
