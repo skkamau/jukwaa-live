@@ -50,7 +50,7 @@ async function main(): Promise<void> {
       email: 'njeri.creator@example.test',
       username: 'njeri_creator',
       displayName: 'Njeri Creator',
-      bio: 'Fictional Jukwaa development creator.',
+      bio: 'Fictional Vyrlo development creator.',
       role: UserRole.VIEWER,
       status: UserStatus.ACTIVE,
     },

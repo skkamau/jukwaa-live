@@ -112,7 +112,7 @@ function CreatorOnboarding() {
       <div className="onboarding-layout">
         <section>
           <span className="eyebrow">CREATOR ONBOARDING</span>
-          <h1>Become a Jukwaa Creator</h1>
+          <h1>Become a Vyrlo Creator</h1>
           <p>Create your channel and start building your audience. Monetisation is separate and is not part of this step.</p>
           <div className="creator-requirements">
             <div className="met"><Check /> Account created</div>

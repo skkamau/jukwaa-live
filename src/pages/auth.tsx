@@ -40,7 +40,7 @@ function AuthShell({
     <div className="auth-page">
       <section className="auth-card">
         <Link className="auth-brand" to="/">
-          <span>J</span> Jukwaa Live
+          <span>V</span> Vyrlo
         </Link>
         <div className="auth-heading">
           <small>{eyebrow}</small>
@@ -144,7 +144,7 @@ export function LoginPage() {
   return (
     <AuthShell
       eyebrow="WELCOME BACK"
-      title="Sign in to Jukwaa"
+      title="Sign in to Vyrlo"
       text="Continue watching, following and creating."
     >
       <form className="auth-form" onSubmit={submit}>
@@ -231,7 +231,7 @@ export function RegisterPage() {
     <AuthShell
       eyebrow="JOIN THE COMMUNITY"
       title="Create your account"
-      text="Your Jukwaa identity for watching and creating."
+      text="Your Vyrlo identity for watching and creating."
     >
       <form className="auth-form" onSubmit={submit}>
         {error && (
@@ -510,7 +510,7 @@ export function VerifyEmailPage() {
             ? "Link not accepted"
             : "Verifying your email…"
       }
-      text="Email verification helps keep Jukwaa accounts trustworthy."
+      text="Email verification helps keep Vyrlo accounts trustworthy."
     >
       <div className={`auth-success ${state}`}>
         {state === "working" || state === "notice" ? (
@@ -524,7 +524,7 @@ export function VerifyEmailPage() {
           {state === "notice"
             ? deliveryDisabled
               ? "Your account has been created. Email verification is temporarily unavailable, but you can log in and use your account."
-              : `Your account is ready. We sent a verification link to ${email}. You can continue using Jukwaa while unverified.`
+              : `Your account is ready. We sent a verification link to ${email}. You can continue using Vyrlo while unverified.`
             : state === "done"
             ? "Your email address is now verified."
             : state === "error"

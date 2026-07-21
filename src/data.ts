@@ -1,4 +1,4 @@
-export const APP = { name: 'Jukwaa Live', slogan: 'Kenya is live.', currency: 'KES', locale: 'en-KE' }
+export const APP = { name: 'Vyrlo', slogan: 'Kenya is live.', currency: 'KES', locale: 'en-KE' }
 export type Creator={id:string;name:string;handle:string;verified?:boolean;followers:number;views:number;bio:string;live?:boolean;accent:string}
 export type Stream={id:string;creatorId:string;title:string;category:string;language:string;viewers:number;duration:string;tags:string[];accent:string;created:number}
 export type Clip={id:string;creatorId:string;title:string;views:number;duration:string;age:string;accent:string}

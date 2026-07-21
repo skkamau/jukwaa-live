@@ -28,11 +28,11 @@ export class MailService {
   }
 
   async sendVerification(email: string, token: string): Promise<void> {
-    await this.send(email, 'Verify your Jukwaa Live email', 'verify-email', token);
+    await this.send(email, 'Verify your Vyrlo email', 'verify-email', token);
   }
 
   async sendPasswordReset(email: string, token: string): Promise<void> {
-    await this.send(email, 'Reset your Jukwaa Live password', 'reset-password', token);
+    await this.send(email, 'Reset your Vyrlo password', 'reset-password', token);
   }
 
   private async send(email: string, subject: string, route: string, token: string): Promise<void> {

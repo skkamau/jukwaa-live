@@ -15,7 +15,7 @@ async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
 
   await app.listen(port, '0.0.0.0');
-  logger.log(`Jukwaa API started in ${environment} mode`);
+  logger.log(`Vyrlo API started in ${environment} mode`);
   logger.log(`Listening on port ${port} at /api/v1`);
 }
 

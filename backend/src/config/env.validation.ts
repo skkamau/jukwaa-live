@@ -56,7 +56,7 @@ const environmentSchema = Joi.object<EnvironmentVariables>({
   SMTP_SECURE: Joi.boolean().default(false),
   SMTP_USER: Joi.when('EMAIL_DELIVERY_MODE', { is: 'smtp', then: Joi.string().required(), otherwise: Joi.string().optional() }),
   SMTP_PASSWORD: Joi.when('EMAIL_DELIVERY_MODE', { is: 'smtp', then: Joi.string().required(), otherwise: Joi.string().optional() }),
-  MAIL_FROM: Joi.string().default('Jukwaa Live <no-reply@jukwaa.live>'),
+  MAIL_FROM: Joi.string().default('Vyrlo <no-reply@jukwaa.live>'),
 }).unknown(true);
 
 export function validateEnvironment(

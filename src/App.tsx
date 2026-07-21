@@ -42,7 +42,7 @@ class ErrorBoundary extends Component<
   render() {
     return this.state.error ? (
       <main className="fatal">
-        <h1>Jukwaa hit a snag.</h1>
+        <h1>Vyrlo hit a snag.</h1>
         <p>Refresh the page to get back to the live action.</p>
       </main>
     ) : (

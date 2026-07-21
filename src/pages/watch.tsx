@@ -7,7 +7,7 @@ import {useApp} from '../context'
 import {streamsApi,type PublicStream} from '../api/streams'
 import {demoContentEnabled} from '../liveStreams'
 
-const description='Late-night Nairobi stories, culture and unfiltered conversation with the Jukwaa community. Pull up, share where you are watching from, and keep the chat respectful.'
+const description='Late-night Nairobi stories, culture and unfiltered conversation with the Vyrlo community. Pull up, share where you are watching from, and keep the chat respectful.'
 
 export function WatchPage(){
   const {streamId}=useParams();
@@ -70,7 +70,7 @@ function RealWatchPage({streamId}:{streamId:string}){
       </div>
     </div>
     <section className="about-stream"><div><span className="section-kicker">REAL STREAM RECORD</span><h2>About this stream</h2><p>{description}</p></div><dl><div><dt>Status</dt><dd>{stream.status}</dd></div><div><dt>Started</dt><dd>{stream.startedAt?new Date(stream.startedAt).toLocaleString():"Not started"}</dd></div><div><dt>Category</dt><dd>{stream.category}</dd></div><div><dt>Language</dt><dd>{stream.language}</dd></div><div><dt>Tags</dt><dd className="tags">{stream.tags.length?stream.tags.map(tag=><span key={tag}>{tag}</span>):"None"}</dd></div></dl></section>
-    {demoContentEnabled&&<section className="section demo-recommendations"><div className="section-head"><div><span className="section-kicker">FICTIONAL DEMO CONTENT</span><h2>Explore the Jukwaa demo</h2></div><Link to="/browse">Browse all <ChevronRight/></Link></div><div className="stream-grid">{streams.slice(0,4).map(item=><StreamCard key={item.id} stream={item}/>)}</div></section>}
+    {demoContentEnabled&&<section className="section demo-recommendations"><div className="section-head"><div><span className="section-kicker">FICTIONAL DEMO CONTENT</span><h2>Explore the Vyrlo demo</h2></div><Link to="/browse">Browse all <ChevronRight/></Link></div><div className="stream-grid">{streams.slice(0,4).map(item=><StreamCard key={item.id} stream={item}/>)}</div></section>}
   </div>
 }
 
@@ -90,7 +90,7 @@ function ChatPanel({onHide}:{onHide:()=>void}){
   return <aside className="chat">
     <header><div><i/> LIVE CHAT {slowMode&&<span>Slow mode</span>}{followersOnly&&<span>Followers only</span>}</div><div className="chat-head-actions"><button aria-label="Chat settings" aria-expanded={settingsOpen} onClick={()=>setSettingsOpen(!settingsOpen)}><Settings/></button><button aria-label="Hide chat" title="Hide Chat" onClick={onHide}><X/></button></div></header>
     {settingsOpen&&<div className="chat-settings"><label><span>Slow mode <small>5 seconds</small></span><input type="checkbox" role="switch" checked={slowMode} onChange={e=>setSlowMode(e.target.checked)}/></label><label><span>Followers-only mode</span><input type="checkbox" role="switch" checked={followersOnly} onChange={e=>setFollowersOnly(e.target.checked)}/></label><label><span>Demo moderator mode</span><input type="checkbox" role="switch" checked={moderatorMode} onChange={e=>setModeratorMode(e.target.checked)}/></label>{moderatorMode&&<button className="clear-chat" onClick={()=>setMessages([])}><Trash2/> Clear chat</button>}<button className="hide-chat-setting" onClick={onHide}><MessageSquareOff/> Hide Chat</button></div>}
-    <div className="system-message">Keep it kind, keep it Kenyan. Respect the Jukwaa community guidelines.</div>
+    <div className="system-message">Keep it kind, keep it Kenyan. Respect the Vyrlo community guidelines.</div>
     <div className="pinned-message"><span>PINNED BY CREATOR</span><p><b>NairobiNightOwl:</b> Leo tunataka kuskia—what is one Nairobi story you will never forget?</p></div>
     <div className="messages" ref={messagesRef}>{messages.length===0?<div className="chat-cleared">Chat cleared by a moderator.</div>:messages.map(m=><div className="chat-message" key={m.id}><p>{m.badge&&<span className={`badge ${m.badge.toLowerCase()}`}>{m.badge}</span>}<b>{m.user}</b> {m.text}</p>{moderatorMode&&m.user!=='You'&&<div className="mod-actions"><button aria-label={`Delete message from ${m.user}`} title="Delete message" onClick={()=>moderate(m.id,'Delete',m.user)}><Trash2/></button><button aria-label={`Timeout ${m.user}`} title="Timeout user" onClick={()=>moderate(m.id,'Timeout',m.user)}><UserRoundX/></button><button aria-label={`Ban ${m.user}`} title="Ban user" onClick={()=>moderate(m.id,'Ban',m.user)}><Shield/></button></div>}</div>)}</div>
     <div className="chat-input"><div><button aria-label="Add emoji" onClick={()=>setText(x=>x+'🔥')}><Smile/></button><input value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder={followersOnly?'Followers can chat…':'Say something…'} aria-label="Chat message"/><button aria-label="Send message" onClick={send}><Send/></button></div><small>Chat responsibly · {slowMode?'5s slow mode':'Standard chat'}{moderatorMode?' · Moderator controls on':''}</small></div>

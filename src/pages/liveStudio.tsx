@@ -120,7 +120,7 @@ function PrepareStream({ error, busy, onPrepare, prelaunchTestMode }: { error: s
   }
   return (
     <div className="page">
-      <PageTitle eyebrow="CREATOR STUDIO" title="Prepare your stream" text="Create a real broadcast record first. Jukwaa waits for the configured provider before marking it live." />
+      <PageTitle eyebrow="CREATOR STUDIO" title="Prepare your stream" text="Create a real broadcast record first. Vyrlo waits for the configured provider before marking it live." />
       {prelaunchTestMode && <TestModeNotice />}
       <div className="go-live-layout">
         <form className="setup-form" onSubmit={submit}>

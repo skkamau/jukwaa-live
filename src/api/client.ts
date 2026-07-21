@@ -30,7 +30,7 @@ export async function apiRequest<T>(
   } catch {
     throw new ApiError(
       0,
-      "Jukwaa could not reach the API. Check that the backend and PostgreSQL are running.",
+      "Vyrlo could not reach the API. Check that the backend and PostgreSQL are running.",
     );
   }
   if (response.ok)

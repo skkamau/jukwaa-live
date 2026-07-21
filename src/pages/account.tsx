@@ -83,7 +83,7 @@ export function EarningsPage() {
       <div className="fee-note">
         <Info />
         <p>
-          <b>Simple, transparent fees.</b> Jukwaa’s planned platform fee is 10%
+          <b>Simple, transparent fees.</b> Vyrlo’s planned platform fee is 10%
           on creator support. Minimum withdrawal will be {money(500)}. Final
           terms may change before launch.
         </p>
@@ -276,7 +276,7 @@ export function SettingsPage() {
             <AlertTriangle />
             <div>
               <h2>Delete account</h2>
-              <p>Permanently remove your Jukwaa profile and demo data.</p>
+              <p>Permanently remove your Vyrlo profile and demo data.</p>
             </div>
             <button className="btn danger" onClick={() => setDel(true)}>
               <Trash2 /> Delete
@@ -327,7 +327,7 @@ function ProfileEditor({ user, onSaved, toast }: { user: AuthUser; onSaved: () =
   return <form className="settings-edit-form" onSubmit={save}>
     {error && <div className="form-error" role="alert">{error}</div>}
     <label>Display name<input value={form.displayName} onChange={(event) => setForm(current => ({ ...current, displayName: event.target.value }))} maxLength={100} required /></label>
-    <label>Bio<textarea value={form.bio} onChange={(event) => setForm(current => ({ ...current, bio: event.target.value }))} maxLength={500} placeholder="Tell the Jukwaa community about yourself." /></label>
+    <label>Bio<textarea value={form.bio} onChange={(event) => setForm(current => ({ ...current, bio: event.target.value }))} maxLength={500} placeholder="Tell the Vyrlo community about yourself." /></label>
     <label>Avatar image URL <span>Optional</span><input type="url" value={form.avatarUrl} onChange={(event) => setForm(current => ({ ...current, avatarUrl: event.target.value }))} maxLength={2048} placeholder="https://example.com/avatar.jpg" /></label>
     <button className="btn btn-accent" disabled={saving}>{saving ? "Saving…" : "Save profile"}</button>
   </form>;

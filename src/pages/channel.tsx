@@ -33,7 +33,7 @@ export function ChannelPage() {
   const liveStream = liveStreams.streams.find((stream) => stream.channel.slug === channel.slug);
   return (
     <div className="creator-page real-channel-page">
-      <div className={`cover real-channel-cover ${liveStream ? "is-live" : ""}`}><span>JUKWAA CHANNEL · {liveStream ? "LIVE" : "OFFLINE"}</span></div>
+      <div className={`cover real-channel-cover ${liveStream ? "is-live" : ""}`}><span>VYRLO CHANNEL · {liveStream ? "LIVE" : "OFFLINE"}</span></div>
       <div className="profile-head">
         {channel.creator.avatarUrl ? (
           <img className="real-avatar" src={channel.creator.avatarUrl} alt="" />

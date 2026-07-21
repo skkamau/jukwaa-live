@@ -39,6 +39,6 @@ export default registerAs(APP_CONFIG_KEY, () => ({
     secure: process.env.SMTP_SECURE === 'true',
     user: process.env.SMTP_USER,
     password: process.env.SMTP_PASSWORD,
-    from: process.env.MAIL_FROM ?? 'Jukwaa Live <no-reply@jukwaa.live>',
+    from: process.env.MAIL_FROM ?? 'Vyrlo <no-reply@jukwaa.live>',
   },
 }));

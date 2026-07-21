@@ -284,7 +284,7 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className={sidebar ? "shell" : "shell collapsed"}>
       <aside className="sidebar">
         <Link className="brand" to="/">
-          <span>J</span>
+          <span>V</span>
           <b>{APP.name}</b>
         </Link>
         <nav>
