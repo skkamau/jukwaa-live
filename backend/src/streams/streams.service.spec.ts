@@ -36,6 +36,7 @@ describe('StreamsService', () => {
     'app.environment': 'development',
     'app.mailMode': 'console',
     'app.prelaunch.enabled': false,
+    'app.prelaunch.allAccounts': false,
     'app.prelaunch.emails': [],
     'app.prelaunch.streamSimulation': false,
     'app.streaming.provider': 'mock',
@@ -57,6 +58,7 @@ describe('StreamsService', () => {
     configValues['app.environment'] = 'development';
     configValues['app.mailMode'] = 'console';
     configValues['app.prelaunch.enabled'] = false;
+    configValues['app.prelaunch.allAccounts'] = false;
     configValues['app.prelaunch.emails'] = [];
     configValues['app.prelaunch.streamSimulation'] = false;
     prisma.channel.findFirst.mockResolvedValue({
@@ -197,6 +199,24 @@ describe('StreamsService', () => {
       simulationAvailable: false,
       prelaunchTestMode: false,
     });
+  });
+
+  it('allows every active channel owner to use demo live controls when all-account prelaunch access is enabled', async () => {
+    configValues['app.environment'] = 'production';
+    configValues['app.mailMode'] = 'disabled';
+    configValues['app.prelaunch.enabled'] = true;
+    configValues['app.prelaunch.allAccounts'] = true;
+    configValues['app.prelaunch.streamSimulation'] = true;
+    prisma.stream.findFirst
+      .mockResolvedValueOnce(baseStream)
+      .mockResolvedValueOnce({ ...baseStream, status: 'LIVE', startedAt: new Date() });
+    sync.synchronize.mockResolvedValue(undefined);
+
+    await expect(service.streamingConfiguration('user-1', 'anyone@example.com')).resolves.toMatchObject({
+      simulationAvailable: true,
+      prelaunchTestMode: true,
+    });
+    await expect(service.simulateLive('user-1', 'anyone@example.com')).resolves.toMatchObject({ status: 'LIVE' });
   });
 
   it('blocks non-allowlisted creators from production simulation', async () => {
