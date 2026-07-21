@@ -83,6 +83,7 @@ export function StreamCard({ stream }: { stream: Stream }) {
       >
         <div className="preview-noise" />
         <LiveBadge />
+        <span className="demo-card-badge">DEMO</span>
         <ViewerCount count={stream.viewers} />
         <span className="preview-mark">
           <Radio />J

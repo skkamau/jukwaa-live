@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { streamsApi, type PublicStream } from "./api/streams";
 
-export const demoContentEnabled =
-  (import.meta.env.VITE_DEMO_CONTENT_ENABLED as string | undefined) !== "false";
+// Keep labelled fictional streams visible during public prelaunch so discovery
+// remains useful while real creators are still testing the platform.
+export const demoContentEnabled = true;
 
 export function useLiveStreams() {
   const [streams, setStreams] = useState<PublicStream[]>([]);
