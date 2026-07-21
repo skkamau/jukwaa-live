@@ -21,7 +21,7 @@ type AuthContextValue = {
     username: string;
     displayName: string;
     password: string;
-  }) => Promise<void>;
+  }) => Promise<boolean>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -50,7 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refresh,
       login: async (identity, password) =>
         setUser((await authApi.login({ identity, password })).user),
-      register: async (data) => setUser((await authApi.register(data)).user),
+      register: async (data) => {
+        const result = await authApi.register(data);
+        setUser(result.user);
+        return result.emailDeliveryAvailable;
+      },
       logout: async () => {
         await authApi.logout();
         setUser(null);

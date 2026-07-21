@@ -210,9 +210,9 @@ export function RegisterPage() {
     setError("");
     setBusy(true);
     try {
-      await register(form);
+      const emailDeliveryAvailable = await register(form);
       navigate(
-        `/verify-email?registered=1&email=${encodeURIComponent(form.email)}`,
+        `/verify-email?registered=1&email=${encodeURIComponent(form.email)}${emailDeliveryAvailable ? "" : "&delivery=disabled"}`,
         { replace: true },
       );
     } catch (reason) {
@@ -460,6 +460,7 @@ export function VerifyEmailPage() {
   const { refresh } = useAuth();
   const [params] = useSearchParams(),
     registered = params.get("registered") === "1",
+    deliveryDisabled = params.get("delivery") === "disabled",
     email = params.get("email") ?? "",
     [state, setState] = useState<"notice" | "working" | "done" | "error">(
       registered ? "notice" : "working",
@@ -517,7 +518,9 @@ export function VerifyEmailPage() {
         )}
         <p>
           {state === "notice"
-            ? `Your account is ready. We sent a verification link to ${email}. You can continue using Jukwaa while unverified.`
+            ? deliveryDisabled
+              ? "Your account has been created. Email verification is temporarily unavailable, but you can log in and use your account."
+              : `Your account is ready. We sent a verification link to ${email}. You can continue using Jukwaa while unverified.`
             : state === "done"
             ? "Your email address is now verified."
             : state === "error"
@@ -527,9 +530,11 @@ export function VerifyEmailPage() {
         {state === "notice" ? (
           <div className="verify-actions">
             <Link className="btn btn-accent" to="/dashboard">Continue</Link>
-            <button className="btn btn-muted" onClick={resend} disabled={resent}>
-              {resent ? "Email sent" : "Resend email"}
-            </button>
+            {!deliveryDisabled && (
+              <button className="btn btn-muted" onClick={resend} disabled={resent}>
+                {resent ? "Email sent" : "Resend email"}
+              </button>
+            )}
           </div>
         ) : (
           <Link className="btn btn-accent" to={state === "done" ? "/dashboard" : "/login"}>

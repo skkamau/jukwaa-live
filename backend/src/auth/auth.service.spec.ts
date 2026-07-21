@@ -21,7 +21,7 @@ describe('AuthService', () => {
   };
   const passwords = { hash: jest.fn(), verify: jest.fn(), dummyVerify: jest.fn() };
   const sessions = { create: jest.fn(), revokeAll: jest.fn() };
-  const mail = { sendVerification: jest.fn(), sendPasswordReset: jest.fn() };
+  const mail = { isDeliveryAvailable: true, sendVerification: jest.fn(), sendPasswordReset: jest.fn() };
   const service = new AuthService(
     prisma as unknown as PrismaService,
     passwords as unknown as PasswordService,
@@ -32,6 +32,7 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mail.isDeliveryAvailable = true;
     passwords.hash.mockResolvedValue('argon-hash');
     sessions.create.mockResolvedValue('raw-session');
     prisma.emailVerificationToken.create.mockResolvedValue({});
@@ -52,6 +53,24 @@ describe('AuthService', () => {
   it('returns a safe conflict for duplicate email or username', async () => {
     prisma.user.create.mockRejectedValue({ code: 'P2002' });
     await expect(service.register({ email: user.email, username: user.username, displayName: user.displayName, password: 'long password value' })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('registers and creates a session without creating email tokens when delivery is disabled', async () => {
+    mail.isDeliveryAvailable = false;
+    prisma.user.create.mockResolvedValue(user);
+
+    const result = await service.register({
+      email: user.email,
+      username: user.username,
+      displayName: user.displayName,
+      password: 'long password value',
+    });
+
+    expect(result.emailDeliveryAvailable).toBe(false);
+    expect(result.user.emailVerified).toBe(false);
+    expect(sessions.create).toHaveBeenCalledWith(user.id);
+    expect(prisma.emailVerificationToken.create).not.toHaveBeenCalled();
+    expect(mail.sendVerification).not.toHaveBeenCalled();
   });
 
   it('logs in with either normalized identity and creates a new session', async () => {
@@ -87,6 +106,19 @@ describe('AuthService', () => {
     await expect(service.requestPasswordReset(user.email)).resolves.toBeUndefined();
     expect(prisma.passwordResetToken.create.mock.calls[0][0].data.tokenHash).toHaveLength(64);
     expect(mail.sendPasswordReset).toHaveBeenCalled();
+  });
+
+  it('does not look up users or create recovery tokens when email delivery is disabled', async () => {
+    mail.isDeliveryAvailable = false;
+
+    await service.requestVerification(user.email);
+    await service.requestPasswordReset(user.email);
+
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.emailVerificationToken.create).not.toHaveBeenCalled();
+    expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
+    expect(mail.sendVerification).not.toHaveBeenCalled();
+    expect(mail.sendPasswordReset).not.toHaveBeenCalled();
   });
 
   it('verifies a valid email token once in a transaction', async () => {

@@ -25,7 +25,11 @@ export class AuthService {
     private readonly mail: MailService,
   ) {}
 
-  async register(input: RegisterDto): Promise<{ user: PublicUser; sessionToken: string }> {
+  get emailDeliveryAvailable(): boolean {
+    return this.mail.isDeliveryAvailable;
+  }
+
+  async register(input: RegisterDto): Promise<{ user: PublicUser; sessionToken: string; emailDeliveryAvailable: boolean }> {
     const passwordHash = await this.passwords.hash(input.password);
     let user: DatabaseUser;
     try {
@@ -44,17 +48,19 @@ export class AuthService {
       }
       throw error;
     }
-    const verification = this.tokens.create();
-    await this.prisma.emailVerificationToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: verification.hash,
-        expiresAt: new Date(Date.now() + VERIFICATION_TTL),
-      },
-    });
+    if (this.emailDeliveryAvailable) {
+      const verification = this.tokens.create();
+      await this.prisma.emailVerificationToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: verification.hash,
+          expiresAt: new Date(Date.now() + VERIFICATION_TTL),
+        },
+      });
+      await this.mail.sendVerification(user.email, verification.raw);
+    }
     const sessionToken = await this.sessions.create(user.id);
-    await this.mail.sendVerification(user.email, verification.raw);
-    return { user: toPublicUser(user), sessionToken };
+    return { user: toPublicUser(user), sessionToken, emailDeliveryAvailable: this.emailDeliveryAvailable };
   }
 
   async login(input: LoginDto): Promise<{ user: PublicUser; sessionToken: string }> {
@@ -75,6 +81,7 @@ export class AuthService {
   }
 
   async requestVerification(email: string): Promise<void> {
+    if (!this.emailDeliveryAvailable) return;
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user || user.deletedAt || user.status !== 'ACTIVE' || user.emailVerifiedAt) return;
     await this.prisma.emailVerificationToken.updateMany({
@@ -111,6 +118,7 @@ export class AuthService {
   }
 
   async requestPasswordReset(email: string): Promise<void> {
+    if (!this.emailDeliveryAvailable) return;
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user || user.deletedAt || user.status !== 'ACTIVE' || !user.passwordHash) return;
     await this.prisma.passwordResetToken.updateMany({

@@ -81,8 +81,13 @@ function CreatorOnboarding() {
   }
   async function resend() {
     if (!user) return;
-    await authApi.resendVerification(user.email);
-    setResent(true);
+    setError("");
+    try {
+      await authApi.resendVerification(user.email);
+      setResent(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Email delivery is temporarily unavailable. Please try again later.");
+    }
   }
   return (
     <div className="page creator-onboarding-page">
@@ -96,7 +101,7 @@ function CreatorOnboarding() {
             <div className="met"><Check /> Account created</div>
             <div className={user?.emailVerified ? "met" : "required"}>{user?.emailVerified ? <Check /> : <span>!</span>} {user?.emailVerified ? "Email verified" : "Email verification required"}</div>
           </div>
-          {!user?.emailVerified && <div className="verification-callout"><div><b>Verify your email before creating a channel.</b><p>Open the verification link sent to {user?.email}.</p></div><button className="btn btn-muted" onClick={resend} disabled={resent}>{resent ? "Verification sent" : "Resend verification"}</button></div>}
+          {!user?.emailVerified && <div className="verification-callout"><div><b>Verify your email before creating a creator channel.</b><p>Email verification may be temporarily unavailable. When delivery is enabled, use the verification link sent to {user?.email}.</p></div><button className="btn btn-muted" onClick={resend} disabled={resent}>{resent ? "Verification sent" : "Resend verification"}</button></div>}
         </section>
         <form className="creator-onboarding-form" onSubmit={submit}>
           <h2>Create your channel</h2>

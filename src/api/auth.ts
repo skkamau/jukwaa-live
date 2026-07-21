@@ -13,6 +13,7 @@ export type AuthUser = {
   createdAt: string;
 };
 type UserResponse = { user: AuthUser };
+export type RegisterResponse = UserResponse & { emailDeliveryAvailable: boolean };
 
 export const authApi = {
   me: () => apiRequest<UserResponse>("/auth/me"),
@@ -22,7 +23,7 @@ export const authApi = {
     displayName: string;
     password: string;
   }) =>
-    apiRequest<UserResponse>("/auth/register", {
+    apiRequest<RegisterResponse>("/auth/register", {
       method: "POST",
       body: JSON.stringify(data),
     }),

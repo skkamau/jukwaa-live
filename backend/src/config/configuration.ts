@@ -16,6 +16,8 @@ export default registerAs(APP_CONFIG_KEY, () => ({
   sessionDays: Number(process.env.SESSION_TTL_DAYS ?? 30),
   authCookieSameSite: process.env.AUTH_COOKIE_SAME_SITE ?? 'lax',
   mailMode: process.env.EMAIL_DELIVERY_MODE ?? 'console',
+  allowDisabledEmailInProduction:
+    process.env.ALLOW_DISABLED_EMAIL_IN_PRODUCTION === 'true',
   streaming: {
     provider: process.env.STREAMING_PROVIDER ?? 'mock',
     statusSyncSeconds: Number(process.env.STREAM_STATUS_SYNC_SECONDS ?? 10),

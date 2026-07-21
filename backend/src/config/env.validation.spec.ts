@@ -87,4 +87,34 @@ describe('validateEnvironment', () => {
       AUTH_COOKIE_SAME_SITE: 'none',
     })).toThrow('AUTH_COOKIE_SAME_SITE=none requires a production Secure cookie');
   });
+
+  it('allows disabled production email only with explicit opt-in', () => {
+    const production = {
+      NODE_ENV: 'production',
+      FRONTEND_ORIGIN: 'https://jukwaa-live.vercel.app',
+      DATABASE_URL: 'postgresql://test:test@db.example/jukwaa',
+      EMAIL_DELIVERY_MODE: 'disabled',
+      STREAMING_PROVIDER: 'mock',
+      ALLOW_MOCK_STREAMING_IN_PRODUCTION: true,
+    };
+
+    expect(() => validateEnvironment(production)).toThrow(
+      'disabled email in production requires ALLOW_DISABLED_EMAIL_IN_PRODUCTION=true',
+    );
+    expect(validateEnvironment({
+      ...production,
+      ALLOW_DISABLED_EMAIL_IN_PRODUCTION: true,
+    }).EMAIL_DELIVERY_MODE).toBe('disabled');
+  });
+
+  it('continues to reject console email delivery in production', () => {
+    expect(() => validateEnvironment({
+      NODE_ENV: 'production',
+      FRONTEND_ORIGIN: 'https://jukwaa-live.vercel.app',
+      DATABASE_URL: 'postgresql://test:test@db.example/jukwaa',
+      EMAIL_DELIVERY_MODE: 'console',
+      STREAMING_PROVIDER: 'mock',
+      ALLOW_MOCK_STREAMING_IN_PRODUCTION: true,
+    })).toThrow('EMAIL_DELIVERY_MODE=console is not allowed in production');
+  });
 });
