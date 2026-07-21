@@ -72,6 +72,9 @@ DATABASE_URL=postgresql://jukwaa:jukwaa_dev_only@localhost:5432/jukwaa_dev
 TRUST_PROXY=false
 SESSION_TTL_DAYS=30
 EMAIL_DELIVERY_MODE=console
+ALLOW_PRELAUNCH_TEST_MODE=false
+PRELAUNCH_TEST_EMAILS=
+ALLOW_PRELAUNCH_STREAM_SIMULATION=false
 MAIL_FROM=Jukwaa Live <no-reply@jukwaa.live>
 STREAMING_PROVIDER=mock
 STREAM_STATUS_SYNC_SECONDS=10
@@ -80,7 +83,9 @@ ALLOW_MOCK_STREAMING_IN_PRODUCTION=false
 
 Public cross-site deployments configure `AUTH_COOKIE_SAME_SITE=none`; production always makes that cookie HttpOnly and Secure. Same-site custom-domain deployments should use `lax`. CORS accepts only `FRONTEND_ORIGIN` plus optional exact comma-separated `FRONTEND_ORIGINS`, and unsafe requests are rejected unless their `Origin` exactly matches that allow-list. Wildcards are never accepted. See [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
-Only `mock` is accepted in Stage 5A. Production requires explicit mock opt-in, and simulation controls are still denied whenever `NODE_ENV=production`. Public responses omit provider stream IDs, credentials, emails, sessions, token data, and infrastructure secrets.
+Only `mock` is accepted in Stage 5A. Production requires explicit mock opt-in. Stream simulation remains denied by default; the only production exception requires disabled email delivery, explicit prelaunch and simulation flags, an authenticated owner whose exact normalized email is allowlisted, and active creator/channel records. Public responses omit provider stream IDs, credentials, creator emails, sessions, token data, and infrastructure secrets.
+
+`POST /api/v1/auth/prelaunch/activate` is an authenticated, idempotent self-activation endpoint. It can update only the signed-in account and only when its exact email is in `PRELAUNCH_TEST_EMAILS`. Wildcards are rejected during startup validation. Prelaunch verification is separately recorded in `prelaunch_verified_at`.
 
 For SMTP, set `EMAIL_DELIVERY_MODE=smtp` plus `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, and `MAIL_FROM`. Console delivery prints development-only verification/reset URLs and is rejected at startup in production.
 

@@ -1,9 +1,13 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { isPrelaunchTestEmail } from '../config/prelaunch';
 import { PrismaService } from '../database/prisma.service';
 import { publicUserSelect, toPublicUser, type DatabaseUser, type PublicUser } from './auth.types';
 import type { LoginDto, RegisterDto } from './dto/auth.dto';
@@ -17,20 +21,34 @@ const RESET_TTL = 60 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly passwords: PasswordService,
     private readonly sessions: SessionService,
     private readonly tokens: TokenService,
     private readonly mail: MailService,
+    private readonly config: ConfigService,
   ) {}
 
   get emailDeliveryAvailable(): boolean {
     return this.mail.isDeliveryAvailable;
   }
 
+  capabilities(email: string, emailVerified: boolean) {
+    const prelaunchTestEligible = isPrelaunchTestEmail(this.config, email);
+    return {
+      prelaunchTestEligible,
+      prelaunchActivationAvailable: prelaunchTestEligible && !emailVerified,
+    };
+  }
+
   async register(input: RegisterDto): Promise<{ user: PublicUser; sessionToken: string; emailDeliveryAvailable: boolean }> {
     const passwordHash = await this.passwords.hash(input.password);
+    const prelaunchVerification = isPrelaunchTestEmail(this.config, input.email)
+      ? new Date()
+      : null;
     let user: DatabaseUser;
     try {
       user = await this.prisma.user.create({
@@ -39,6 +57,8 @@ export class AuthService {
           username: input.username,
           displayName: input.displayName,
           passwordHash,
+          emailVerifiedAt: prelaunchVerification,
+          prelaunchVerifiedAt: prelaunchVerification,
         },
         select: publicUserSelect,
       });
@@ -60,7 +80,33 @@ export class AuthService {
       await this.mail.sendVerification(user.email, verification.raw);
     }
     const sessionToken = await this.sessions.create(user.id);
+    if (prelaunchVerification) {
+      this.logger.warn(`Prelaunch test verification recorded for user ${user.id}`);
+    }
     return { user: toPublicUser(user), sessionToken, emailDeliveryAvailable: this.emailDeliveryAvailable };
+  }
+
+  async activatePrelaunch(userId: string, email: string): Promise<PublicUser> {
+    if (!isPrelaunchTestEmail(this.config, email)) {
+      throw new ForbiddenException('This account is not eligible for prelaunch test activation');
+    }
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, email: email.trim().toLowerCase(), status: 'ACTIVE', deletedAt: null },
+      select: { ...publicUserSelect, prelaunchVerifiedAt: true },
+    });
+    if (!user) throw new ForbiddenException('This account is not eligible for prelaunch test activation');
+    if (user.prelaunchVerifiedAt) return toPublicUser(user);
+    const activatedAt = new Date();
+    const activated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerifiedAt: user.emailVerifiedAt ?? activatedAt,
+        prelaunchVerifiedAt: activatedAt,
+      },
+      select: publicUserSelect,
+    });
+    this.logger.warn(`Prelaunch test verification activated for user ${user.id}`);
+    return toPublicUser(activated);
   }
 
   async login(input: LoginDto): Promise<{ user: PublicUser; sessionToken: string }> {

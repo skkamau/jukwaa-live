@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { isPrelaunchStreamSimulationAllowed } from '../config/prelaunch';
 import { PrismaService } from '../database/prisma.service';
 import {
   STREAMING_PROVIDER,
@@ -110,21 +111,27 @@ export class StreamsService {
     return this.findPublicDetail(stream.id);
   }
 
-  async streamingConfiguration(userId: string) {
+  async streamingConfiguration(userId: string, email: string) {
     const channel = await this.requireActiveOwnedChannel(userId);
     await this.ensureProviderConfig(channel.id);
     const providerConfiguration =
       await this.provider.getCreatorStreamingConfiguration(channel.id);
+    const developmentSimulationAvailable =
+      this.config.get<string>('app.environment') !== 'production' &&
+      this.provider.type === 'MOCK';
+    const prelaunchTestMode =
+      this.config.get<string>('app.environment') === 'production' &&
+      isPrelaunchStreamSimulationAllowed(this.config, email);
     return {
       ...providerConfiguration,
-      developmentSimulationAvailable:
-        this.config.get<string>('app.environment') !== 'production' &&
-        this.provider.type === 'MOCK',
+      developmentSimulationAvailable,
+      simulationAvailable: developmentSimulationAvailable || prelaunchTestMode,
+      prelaunchTestMode,
     };
   }
 
-  async simulateLive(userId: string) {
-    this.assertDevelopmentMock();
+  async simulateLive(userId: string, email: string) {
+    this.assertSimulationAllowed(email);
     const stream = await this.requireOwnedActiveStream(userId);
     if (stream.status !== 'PREPARING') {
       throw new ConflictException('The stream must be preparing before it can go live');
@@ -139,8 +146,8 @@ export class StreamsService {
     return this.findPublicDetail(stream.id);
   }
 
-  async simulateEnd(userId: string) {
-    this.assertDevelopmentMock();
+  async simulateEnd(userId: string, email: string) {
+    this.assertSimulationAllowed(email);
     const stream = await this.requireOwnedActiveStream(userId);
     if (stream.status !== 'LIVE') {
       throw new ConflictException('The stream must be live before it can end');
@@ -270,12 +277,15 @@ export class StreamsService {
     }
   }
 
-  private assertDevelopmentMock(): void {
-    if (
-      this.config.get<string>('app.environment') === 'production' ||
-      this.provider.type !== 'MOCK'
-    ) {
-      throw new ForbiddenException('Development stream simulation is unavailable');
+  private assertSimulationAllowed(email: string): void {
+    const isDevelopmentMock =
+      this.config.get<string>('app.environment') !== 'production' &&
+      this.provider.type === 'MOCK';
+    const isAllowlistedPrelaunch =
+      this.config.get<string>('app.environment') === 'production' &&
+      isPrelaunchStreamSimulationAllowed(this.config, email);
+    if (!isDevelopmentMock && !isAllowlistedPrelaunch) {
+      throw new ForbiddenException('Stream simulation is unavailable for this account');
     }
     if (!this.provider.setDevelopmentBroadcast) {
       throw new ForbiddenException('The configured provider cannot be simulated');

@@ -12,6 +12,9 @@ export interface EnvironmentVariables extends Record<string, unknown> {
   SESSION_TTL_DAYS: number;
   EMAIL_DELIVERY_MODE: 'console' | 'smtp' | 'disabled';
   ALLOW_DISABLED_EMAIL_IN_PRODUCTION: boolean;
+  ALLOW_PRELAUNCH_TEST_MODE: boolean;
+  PRELAUNCH_TEST_EMAILS: string;
+  ALLOW_PRELAUNCH_STREAM_SIMULATION: boolean;
   STREAMING_PROVIDER: 'mock';
   STREAM_STATUS_SYNC_SECONDS: number;
   ALLOW_MOCK_STREAMING_IN_PRODUCTION: boolean;
@@ -34,6 +37,16 @@ const environmentSchema = Joi.object<EnvironmentVariables>({
   SESSION_TTL_DAYS: Joi.number().integer().min(1).max(365).default(30),
   EMAIL_DELIVERY_MODE: Joi.string().valid('console', 'smtp', 'disabled').default('console'),
   ALLOW_DISABLED_EMAIL_IN_PRODUCTION: Joi.boolean().default(false),
+  ALLOW_PRELAUNCH_TEST_MODE: Joi.boolean().default(false),
+  PRELAUNCH_TEST_EMAILS: Joi.string().allow('').default('').custom((raw: string, helpers) => {
+    const emails = raw.split(',').map((email) => email.trim().toLowerCase()).filter(Boolean);
+    const emailSchema = Joi.string().email({ tlds: { allow: false } });
+    if (emails.some((email) => email.includes('*') || email.startsWith('@') || emailSchema.validate(email).error)) {
+      return helpers.error('any.invalid');
+    }
+    return [...new Set(emails)].join(',');
+  }, 'exact email allowlist normalization'),
+  ALLOW_PRELAUNCH_STREAM_SIMULATION: Joi.boolean().default(false),
   STREAMING_PROVIDER: Joi.string().valid('mock').default('mock'),
   STREAM_STATUS_SYNC_SECONDS: Joi.number().integer().min(2).max(300).default(10),
   ALLOW_MOCK_STREAMING_IN_PRODUCTION: Joi.boolean().default(false),
@@ -64,6 +77,28 @@ export function validateEnvironment(
   ) {
     throw new Error(
       'Environment validation failed: FRONTEND_ORIGIN is required in production',
+    );
+  }
+
+  if (value.ALLOW_PRELAUNCH_STREAM_SIMULATION && !value.ALLOW_PRELAUNCH_TEST_MODE) {
+    throw new Error(
+      'Environment validation failed: prelaunch stream simulation requires ALLOW_PRELAUNCH_TEST_MODE=true',
+    );
+  }
+
+  if (value.ALLOW_PRELAUNCH_STREAM_SIMULATION && value.STREAMING_PROVIDER !== 'mock') {
+    throw new Error(
+      'Environment validation failed: prelaunch stream simulation requires STREAMING_PROVIDER=mock',
+    );
+  }
+
+  if (
+    value.NODE_ENV === 'production' &&
+    value.ALLOW_PRELAUNCH_TEST_MODE &&
+    value.EMAIL_DELIVERY_MODE !== 'disabled'
+  ) {
+    throw new Error(
+      'Environment validation failed: production prelaunch test mode requires EMAIL_DELIVERY_MODE=disabled',
     );
   }
 

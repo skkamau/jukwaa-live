@@ -20,7 +20,11 @@ export class AuthController {
   async register(@Body() input: RegisterDto, @Res({ passthrough: true }) response: Response) {
     const result = await this.auth.register(input);
     response.cookie(SESSION_COOKIE, result.sessionToken, this.sessions.cookieOptions);
-    return { user: result.user, emailDeliveryAvailable: result.emailDeliveryAvailable };
+    return {
+      user: result.user,
+      emailDeliveryAvailable: result.emailDeliveryAvailable,
+      capabilities: this.auth.capabilities(result.user.email, result.user.emailVerified),
+    };
   }
 
   @Post('login')
@@ -29,13 +33,32 @@ export class AuthController {
   async login(@Body() input: LoginDto, @Res({ passthrough: true }) response: Response) {
     const result = await this.auth.login(input);
     response.cookie(SESSION_COOKIE, result.sessionToken, this.sessions.cookieOptions);
-    return { user: result.user };
+    return {
+      user: result.user,
+      capabilities: this.auth.capabilities(result.user.email, result.user.emailVerified),
+    };
   }
 
   @Get('me')
   @UseGuards(AuthGuard)
   me(@CurrentUser() user: AuthenticatedRequestUser) {
-    return { user: toPublicUser(user) };
+    const publicUser = toPublicUser(user);
+    return {
+      user: publicUser,
+      capabilities: this.auth.capabilities(publicUser.email, publicUser.emailVerified),
+    };
+  }
+
+  @Post('prelaunch/activate')
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 15 * 60_000 } })
+  async activatePrelaunch(@CurrentUser() user: AuthenticatedRequestUser) {
+    const activated = await this.auth.activatePrelaunch(user.id, user.email);
+    return {
+      user: activated,
+      capabilities: this.auth.capabilities(activated.email, activated.emailVerified),
+    };
   }
 
   @Post('logout')

@@ -15,6 +15,7 @@ export type PublicStream = {
   endedAt: string | null;
   createdAt: string;
   recordingAvailable: false;
+  streamingProvider: "MOCK" | "LOCAL" | "AMAZON_IVS";
   channel: { id: string; slug: string; name: string };
   creator: { username: string; displayName: string; avatarUrl: string | null };
   playback: null | {
@@ -38,6 +39,8 @@ export type StreamingConfiguration = {
   mode: "development";
   realVideoAvailable: false;
   developmentSimulationAvailable: boolean;
+  simulationAvailable: boolean;
+  prelaunchTestMode: boolean;
 };
 
 export const streamsApi = {

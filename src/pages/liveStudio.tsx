@@ -62,6 +62,7 @@ export function GoLivePage() {
         error={error}
         busy={busy}
         onPrepare={(input) => act(() => streamsApi.prepare(input))}
+        prelaunchTestMode={configuration?.prelaunchTestMode ?? false}
       />
     );
   }
@@ -79,6 +80,7 @@ export function GoLivePage() {
         <span className={`stream-state-pill ${stream.status.toLowerCase()}`}><i /> {stream.status}</span>
       </div>
       {error && <div className="form-error" role="alert">{error}</div>}
+      {configuration?.prelaunchTestMode && <TestModeNotice />}
       <RealStatusBar stream={stream} />
       <div className="live-studio-layout">
         <main className="studio-main">
@@ -87,7 +89,7 @@ export function GoLivePage() {
             {stream.status === "PREPARING" && (
               <button className="end-control" disabled={busy} onClick={() => act(streamsApi.cancel)}><X /> Cancel prepared stream</button>
             )}
-            {stream.status === "LIVE" && configuration?.developmentSimulationAvailable && (
+            {stream.status === "LIVE" && configuration?.simulationAvailable && (
               <button className="end-control" disabled={busy} onClick={() => act(streamsApi.simulateEnd)}><Square /> Simulate Stream End</button>
             )}
           </div>
@@ -97,9 +99,9 @@ export function GoLivePage() {
           <div><Shield /><h3>Chat is not connected yet</h3><p>Real chat and WebSockets are intentionally outside Stage 5A. No fictional messages are attached to this real stream.</p></div>
         </aside>
       </div>
-      {configuration?.developmentSimulationAvailable && (
+      {configuration?.simulationAvailable && (
         <section className="development-controls panel">
-          <div><Code2 /><div><span className="section-kicker">DEVELOPMENT STREAMING CONTROLS</span><h2>Mock provider · no video delivery</h2><p>This deterministic control is available only in non-production mock mode.</p></div></div>
+          <div><Code2 /><div><span className="section-kicker">{configuration.prelaunchTestMode ? "PRELAUNCH TEST CONTROLS" : "DEVELOPMENT STREAMING CONTROLS"}</span><h2>Mock provider · no video delivery</h2><p>This deterministic control changes stream status only. It never broadcasts video.</p></div></div>
           {stream.status === "PREPARING" && <button className="btn btn-accent" disabled={busy} onClick={() => act(streamsApi.simulateLive)}><Radio /> Simulate Go Live</button>}
           {stream.status === "LIVE" && <button className="btn btn-muted" disabled={busy} onClick={() => act(streamsApi.simulateEnd)}><Square /> Simulate End</button>}
         </section>
@@ -109,7 +111,7 @@ export function GoLivePage() {
   );
 }
 
-function PrepareStream({ error, busy, onPrepare }: { error: string; busy: boolean; onPrepare: (input: StreamInput) => void }) {
+function PrepareStream({ error, busy, onPrepare, prelaunchTestMode }: { error: string; busy: boolean; onPrepare: (input: StreamInput) => void; prelaunchTestMode: boolean }) {
   const [form, setForm] = useState(initialInput);
   const [tags, setTags] = useState("");
   function submit(event: FormEvent) {
@@ -119,6 +121,7 @@ function PrepareStream({ error, busy, onPrepare }: { error: string; busy: boolea
   return (
     <div className="page">
       <PageTitle eyebrow="CREATOR STUDIO" title="Prepare your stream" text="Create a real broadcast record first. Jukwaa waits for the configured provider before marking it live." />
+      {prelaunchTestMode && <TestModeNotice />}
       <div className="go-live-layout">
         <form className="setup-form" onSubmit={submit}>
           {error && <div className="form-error" role="alert">{error}</div>}
@@ -139,6 +142,10 @@ function PrepareStream({ error, busy, onPrepare }: { error: string; busy: boolea
       </div>
     </div>
   );
+}
+
+function TestModeNotice() {
+  return <div className="form-error test-mode-notice" role="status"><b>TEST MODE — No real video is being broadcast.</b><span>This is a prelaunch test stream. Real video broadcasting has not been enabled.</span></div>;
 }
 
 function RealStatusBar({ stream }: { stream: PublicStream }) {

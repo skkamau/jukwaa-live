@@ -12,7 +12,11 @@ export type AuthUser = {
   emailVerified: boolean;
   createdAt: string;
 };
-type UserResponse = { user: AuthUser };
+export type AuthCapabilities = {
+  prelaunchTestEligible: boolean;
+  prelaunchActivationAvailable: boolean;
+};
+type UserResponse = { user: AuthUser; capabilities: AuthCapabilities };
 export type RegisterResponse = UserResponse & { emailDeliveryAvailable: boolean };
 
 export const authApi = {
@@ -54,4 +58,6 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify({ email }),
     }),
+  activatePrelaunch: () =>
+    apiRequest<UserResponse>("/auth/prelaunch/activate", { method: "POST" }),
 };

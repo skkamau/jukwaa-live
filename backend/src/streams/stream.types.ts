@@ -81,6 +81,7 @@ export function toSafeStream(
     endedAt: stream.endedAt,
     createdAt: stream.createdAt,
     recordingAvailable: false,
+    streamingProvider: stream.streamingProvider,
     channel: {
       id: stream.channel.id,
       slug: stream.channel.slug,

@@ -1,4 +1,5 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
 import type { PrismaService } from '../database/prisma.service';
 import { AuthService } from './auth.service';
 import type { MailService } from './mail.service';
@@ -14,7 +15,7 @@ const user = {
 
 describe('AuthService', () => {
   const prisma = {
-    user: { create: jest.fn(), findFirst: jest.fn(), findUnique: jest.fn() },
+    user: { create: jest.fn(), findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     emailVerificationToken: { create: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn() },
     passwordResetToken: { create: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn() },
     $transaction: jest.fn(),
@@ -22,17 +23,27 @@ describe('AuthService', () => {
   const passwords = { hash: jest.fn(), verify: jest.fn(), dummyVerify: jest.fn() };
   const sessions = { create: jest.fn(), revokeAll: jest.fn() };
   const mail = { isDeliveryAvailable: true, sendVerification: jest.fn(), sendPasswordReset: jest.fn() };
+  const configValues: Record<string, unknown> = {
+    'app.prelaunch.enabled': false,
+    'app.prelaunch.emails': [],
+    'app.mailMode': 'console',
+  };
+  const config = { get: jest.fn((key: string, fallback?: unknown) => configValues[key] ?? fallback) };
   const service = new AuthService(
     prisma as unknown as PrismaService,
     passwords as unknown as PasswordService,
     sessions as unknown as SessionService,
     new TokenService(),
     mail as unknown as MailService,
+    config as unknown as ConfigService,
   );
 
   beforeEach(() => {
     jest.clearAllMocks();
     mail.isDeliveryAvailable = true;
+    configValues['app.prelaunch.enabled'] = false;
+    configValues['app.prelaunch.emails'] = [];
+    configValues['app.mailMode'] = 'console';
     passwords.hash.mockResolvedValue('argon-hash');
     sessions.create.mockResolvedValue('raw-session');
     prisma.emailVerificationToken.create.mockResolvedValue({});
@@ -71,6 +82,68 @@ describe('AuthService', () => {
     expect(sessions.create).toHaveBeenCalledWith(user.id);
     expect(prisma.emailVerificationToken.create).not.toHaveBeenCalled();
     expect(mail.sendVerification).not.toHaveBeenCalled();
+  });
+
+  it('records prelaunch verification during registration only for an exactly allowlisted email', async () => {
+    mail.isDeliveryAvailable = false;
+    configValues['app.prelaunch.enabled'] = true;
+    configValues['app.prelaunch.emails'] = [user.email];
+    configValues['app.mailMode'] = 'disabled';
+    prisma.user.create.mockResolvedValue({ ...user, emailVerifiedAt: new Date() });
+
+    const result = await service.register({
+      email: user.email,
+      username: user.username,
+      displayName: user.displayName,
+      password: 'long password value',
+    });
+
+    expect(result.user.emailVerified).toBe(true);
+    expect(prisma.user.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        emailVerifiedAt: expect.any(Date),
+        prelaunchVerifiedAt: expect.any(Date),
+      }),
+    }));
+    expect(prisma.emailVerificationToken.create).not.toHaveBeenCalled();
+  });
+
+  it('allows an allowlisted authenticated user to activate only their own account', async () => {
+    configValues['app.prelaunch.enabled'] = true;
+    configValues['app.prelaunch.emails'] = [user.email];
+    configValues['app.mailMode'] = 'disabled';
+    prisma.user.findFirst.mockResolvedValue(user);
+    prisma.user.update.mockResolvedValue({ ...user, emailVerifiedAt: new Date() });
+
+    await expect(service.activatePrelaunch(user.id, user.email)).resolves.toMatchObject({ emailVerified: true });
+    expect(prisma.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: user.id, email: user.email }),
+    }));
+    expect(prisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: user.id },
+      data: expect.objectContaining({ prelaunchVerifiedAt: expect.any(Date) }),
+    }));
+  });
+
+  it('rejects non-allowlisted prelaunch activation', async () => {
+    configValues['app.prelaunch.enabled'] = true;
+    configValues['app.prelaunch.emails'] = ['another@example.com'];
+    configValues['app.mailMode'] = 'disabled';
+    await expect(service.activatePrelaunch(user.id, user.email)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('makes prelaunch activation idempotent for an already verified allowlisted user', async () => {
+    configValues['app.prelaunch.enabled'] = true;
+    configValues['app.prelaunch.emails'] = [user.email];
+    configValues['app.mailMode'] = 'disabled';
+    prisma.user.findFirst.mockResolvedValue({
+      ...user,
+      emailVerifiedAt: new Date(),
+      prelaunchVerifiedAt: new Date(),
+    });
+    await expect(service.activatePrelaunch(user.id, user.email)).resolves.toMatchObject({ emailVerified: true });
+    expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
   it('logs in with either normalized identity and creates a new session', async () => {

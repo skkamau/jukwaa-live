@@ -117,4 +117,47 @@ describe('validateEnvironment', () => {
       ALLOW_MOCK_STREAMING_IN_PRODUCTION: true,
     })).toThrow('EMAIL_DELIVERY_MODE=console is not allowed in production');
   });
+
+  it('normalizes exact prelaunch email allowlist entries', () => {
+    const result = validateEnvironment({
+      NODE_ENV: 'test',
+      FRONTEND_ORIGIN: 'http://localhost:5173',
+      DATABASE_URL: 'postgresql://test:test@localhost:5432/jukwaa_test',
+      PRELAUNCH_TEST_EMAILS: ' Tester@Example.com, second@example.com, tester@example.com ',
+    });
+    expect(result.PRELAUNCH_TEST_EMAILS).toBe('tester@example.com,second@example.com');
+  });
+
+  it.each(['*', '@example.com', '*.com', 'valid@example.com,*'])('rejects unsafe prelaunch allowlist %s', (emails) => {
+    expect(() => validateEnvironment({
+      NODE_ENV: 'test',
+      FRONTEND_ORIGIN: 'http://localhost:5173',
+      DATABASE_URL: 'postgresql://test:test@localhost:5432/jukwaa_test',
+      PRELAUNCH_TEST_EMAILS: emails,
+    })).toThrow('PRELAUNCH_TEST_EMAILS');
+  });
+
+  it('requires prelaunch mode before enabling stream simulation', () => {
+    expect(() => validateEnvironment({
+      NODE_ENV: 'test',
+      FRONTEND_ORIGIN: 'http://localhost:5173',
+      DATABASE_URL: 'postgresql://test:test@localhost:5432/jukwaa_test',
+      ALLOW_PRELAUNCH_STREAM_SIMULATION: true,
+    })).toThrow('prelaunch stream simulation requires ALLOW_PRELAUNCH_TEST_MODE=true');
+  });
+
+  it('requires disabled email delivery for production prelaunch mode', () => {
+    expect(() => validateEnvironment({
+      NODE_ENV: 'production',
+      FRONTEND_ORIGIN: 'https://jukwaa-live.vercel.app',
+      DATABASE_URL: 'postgresql://test:test@db.example/jukwaa',
+      EMAIL_DELIVERY_MODE: 'smtp',
+      SMTP_HOST: 'smtp.example.com',
+      SMTP_USER: 'user',
+      SMTP_PASSWORD: 'password',
+      STREAMING_PROVIDER: 'mock',
+      ALLOW_MOCK_STREAMING_IN_PRODUCTION: true,
+      ALLOW_PRELAUNCH_TEST_MODE: true,
+    })).toThrow('production prelaunch test mode requires EMAIL_DELIVERY_MODE=disabled');
+  });
 });

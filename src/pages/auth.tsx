@@ -210,9 +210,13 @@ export function RegisterPage() {
     setError("");
     setBusy(true);
     try {
-      const emailDeliveryAvailable = await register(form);
+      const registration = await register(form);
+      if (registration.emailVerified) {
+        navigate("/dashboard", { replace: true });
+        return;
+      }
       navigate(
-        `/verify-email?registered=1&email=${encodeURIComponent(form.email)}${emailDeliveryAvailable ? "" : "&delivery=disabled"}`,
+        `/verify-email?registered=1&email=${encodeURIComponent(form.email)}${registration.emailDeliveryAvailable ? "" : "&delivery=disabled"}`,
         { replace: true },
       );
     } catch (reason) {

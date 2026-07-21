@@ -49,7 +49,7 @@ PREPARING -> LIVE -> ENDED
 
 `STREAMING_PROVIDER=mock` selects `MockStreamingProvider`. It offers development-only **Simulate Go Live** and **Simulate End** controls so the full dashboard, discovery, public API, channel, and watch-page lifecycle can be tested deterministically. It does not ingest, transcode, distribute, play, or record video. Simulation endpoints require an authenticated stream owner, non-production `NODE_ENV`, and the mock provider.
 
-Production refuses an implicit mock provider. An intentional non-video production demonstration must explicitly set both `STREAMING_PROVIDER=mock` and `ALLOW_MOCK_STREAMING_IN_PRODUCTION=true`; development simulation endpoints remain blocked in production.
+Production refuses an implicit mock provider. An intentional non-video production demonstration must explicitly set both `STREAMING_PROVIDER=mock` and `ALLOW_MOCK_STREAMING_IN_PRODUCTION=true`. Production simulation remains blocked except for exact-email prelaunch testers when disabled email delivery and both dedicated prelaunch flags are also explicitly enabled. This exception changes persisted stream lifecycle state only; it does not deliver video.
 
 ## Demo content toggle
 

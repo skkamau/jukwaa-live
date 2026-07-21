@@ -32,7 +32,15 @@ describe('StreamsService', () => {
       findUnique: jest.fn(), create: jest.fn(), findUniqueOrThrow: jest.fn(),
     },
   };
-  const config = { get: jest.fn().mockReturnValue('development') };
+  const configValues: Record<string, unknown> = {
+    'app.environment': 'development',
+    'app.mailMode': 'console',
+    'app.prelaunch.enabled': false,
+    'app.prelaunch.emails': [],
+    'app.prelaunch.streamSimulation': false,
+    'app.streaming.provider': 'mock',
+  };
+  const config = { get: jest.fn((key: string, fallback?: unknown) => configValues[key] ?? fallback) };
   const lifecycle = { cancelPreparing: jest.fn() };
   const sync = { synchronize: jest.fn() };
   const provider = new MockStreamingProvider();
@@ -46,7 +54,11 @@ describe('StreamsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    config.get.mockReturnValue('development');
+    configValues['app.environment'] = 'development';
+    configValues['app.mailMode'] = 'console';
+    configValues['app.prelaunch.enabled'] = false;
+    configValues['app.prelaunch.emails'] = [];
+    configValues['app.prelaunch.streamSimulation'] = false;
     prisma.channel.findFirst.mockResolvedValue({
       id: 'channel-1', status: 'ACTIVE', creatorProfile: { status: 'ACTIVE' },
     });
@@ -116,8 +128,8 @@ describe('StreamsService', () => {
   it.each([
     ['update metadata', () => service.updateCurrent('user-1', { title: 'Blocked' })],
     ['cancel', () => service.cancelCurrent('user-1')],
-    ['simulate live', () => service.simulateLive('user-1')],
-    ['simulate end', () => service.simulateEnd('user-1')],
+    ['simulate live', () => service.simulateLive('user-1', 'owner@example.com')],
+    ['simulate end', () => service.simulateEnd('user-1', 'owner@example.com')],
   ])('re-checks active creator/channel status before %s', async (_label, mutate) => {
     prisma.channel.findFirst.mockResolvedValue({
       id: 'channel-1', status: 'ACTIVE', creatorProfile: { status: 'SUSPENDED' },
@@ -138,18 +150,76 @@ describe('StreamsService', () => {
   });
 
   it('blocks mock simulation in production before changing provider state', async () => {
-    config.get.mockReturnValue('production');
-    await expect(service.simulateLive('user-1')).rejects.toBeInstanceOf(ForbiddenException);
+    configValues['app.environment'] = 'production';
+    await expect(service.simulateLive('user-1', 'owner@example.com')).rejects.toBeInstanceOf(ForbiddenException);
     expect(sync.synchronize).not.toHaveBeenCalled();
   });
 
   it('never advertises development simulation controls in production', async () => {
-    config.get.mockReturnValue('production');
-    await expect(service.streamingConfiguration('user-1')).resolves.toMatchObject({
+    configValues['app.environment'] = 'production';
+    await expect(service.streamingConfiguration('user-1', 'owner@example.com')).resolves.toMatchObject({
       provider: 'mock',
       realVideoAvailable: false,
       developmentSimulationAvailable: false,
+      simulationAvailable: false,
+      prelaunchTestMode: false,
     });
+  });
+
+  it('allows an exactly allowlisted owner to simulate in production when both flags are enabled', async () => {
+    configValues['app.environment'] = 'production';
+    configValues['app.mailMode'] = 'disabled';
+    configValues['app.prelaunch.enabled'] = true;
+    configValues['app.prelaunch.emails'] = ['owner@example.com'];
+    configValues['app.prelaunch.streamSimulation'] = true;
+    prisma.stream.findFirst
+      .mockResolvedValueOnce(baseStream)
+      .mockResolvedValueOnce({ ...baseStream, status: 'LIVE', startedAt: new Date() });
+    sync.synchronize.mockResolvedValue(undefined);
+
+    await expect(service.simulateLive('user-1', 'owner@example.com')).resolves.toMatchObject({ status: 'LIVE' });
+    expect(sync.synchronize).toHaveBeenCalled();
+  });
+
+  it('advertises prelaunch controls only to the exactly allowlisted creator', async () => {
+    configValues['app.environment'] = 'production';
+    configValues['app.mailMode'] = 'disabled';
+    configValues['app.prelaunch.enabled'] = true;
+    configValues['app.prelaunch.emails'] = ['owner@example.com'];
+    configValues['app.prelaunch.streamSimulation'] = true;
+
+    await expect(service.streamingConfiguration('user-1', 'owner@example.com')).resolves.toMatchObject({
+      developmentSimulationAvailable: false,
+      simulationAvailable: true,
+      prelaunchTestMode: true,
+    });
+    await expect(service.streamingConfiguration('user-1', 'other@example.com')).resolves.toMatchObject({
+      simulationAvailable: false,
+      prelaunchTestMode: false,
+    });
+  });
+
+  it('blocks non-allowlisted creators from production simulation', async () => {
+    configValues['app.environment'] = 'production';
+    configValues['app.mailMode'] = 'disabled';
+    configValues['app.prelaunch.enabled'] = true;
+    configValues['app.prelaunch.emails'] = ['owner@example.com'];
+    configValues['app.prelaunch.streamSimulation'] = true;
+
+    await expect(service.simulateLive('user-1', 'other@example.com')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.stream.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('does not let an allowlisted non-owner simulate another channel', async () => {
+    configValues['app.environment'] = 'production';
+    configValues['app.mailMode'] = 'disabled';
+    configValues['app.prelaunch.enabled'] = true;
+    configValues['app.prelaunch.emails'] = ['owner@example.com'];
+    configValues['app.prelaunch.streamSimulation'] = true;
+    prisma.channel.findFirst.mockResolvedValue(null);
+
+    await expect(service.simulateLive('other-user', 'owner@example.com')).rejects.toBeInstanceOf(NotFoundException);
+    expect(sync.synchronize).not.toHaveBeenCalled();
   });
 
   it('returns only LIVE records from the public list and no credentials', async () => {

@@ -75,8 +75,9 @@ function RealWatchPage({streamId}:{streamId:string}){
 }
 
 function StreamPlayer({stream}:{stream:PublicStream}){
-  const message=stream.status==='PREPARING'?'Waiting for the creator to go live.':stream.status==='ENDED'?'This stream has ended.':stream.status==='LIVE'&&stream.playback?.provider==='mock'?'Development livestream simulation':'Stream unavailable.'
-  return <div className={`player real-stream-player ${stream.status.toLowerCase()}`}><div className="player-top"><span className={`stream-state-pill ${stream.status.toLowerCase()}`}><i/>{stream.status}</span></div><div className="real-player-message"><Radio/><h2>{message}</h2><p>{stream.status==='LIVE'?'Mock mode confirms lifecycle and discovery only. No video is being delivered.':stream.recordingAvailable?'Recording available.':'No recording is available.'}</p></div></div>
+  const isMockTest=stream.streamingProvider==='MOCK'||stream.playback?.provider==='mock';
+  const message=stream.status==='PREPARING'?'Waiting for the creator to go live.':stream.status==='ENDED'?'This stream has ended.':stream.status==='LIVE'&&isMockTest?'This is a prelaunch test stream. Real video broadcasting has not been enabled.':'Stream unavailable.'
+  return <div className={`player real-stream-player ${stream.status.toLowerCase()}`}><div className="player-top"><span className={`stream-state-pill ${stream.status.toLowerCase()}`}><i/>{stream.status}</span>{isMockTest&&<span className="test-mode-player-label">TEST MODE — No real video is being broadcast.</span>}</div><div className="real-player-message"><Radio/><h2>{message}</h2><p>{stream.status==='LIVE'?'Mock mode confirms lifecycle and discovery only. No video is being delivered.':stream.recordingAvailable?'Recording available.':'No recording is available.'}</p></div></div>
 }
 
 type ChatMessage={id:number;user:string;text:string;badge?:string}

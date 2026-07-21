@@ -47,13 +47,13 @@ export class StreamsController {
   @Post('me/current/simulate-live')
   @UseGuards(AuthGuard)
   async simulateLive(@CurrentUser() user: AuthenticatedRequestUser) {
-    return { stream: await this.streams.simulateLive(user.id) };
+    return { stream: await this.streams.simulateLive(user.id, user.email) };
   }
 
   @Post('me/current/simulate-end')
   @UseGuards(AuthGuard)
   async simulateEnd(@CurrentUser() user: AuthenticatedRequestUser) {
-    return { stream: await this.streams.simulateEnd(user.id) };
+    return { stream: await this.streams.simulateEnd(user.id, user.email) };
   }
 
   @Get(':id')
@@ -69,6 +69,6 @@ export class CreatorStreamingController {
 
   @Get()
   async configuration(@CurrentUser() user: AuthenticatedRequestUser) {
-    return { streaming: await this.streams.streamingConfiguration(user.id) };
+    return { streaming: await this.streams.streamingConfiguration(user.id, user.email) };
   }
 }

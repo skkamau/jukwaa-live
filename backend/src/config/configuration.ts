@@ -18,6 +18,15 @@ export default registerAs(APP_CONFIG_KEY, () => ({
   mailMode: process.env.EMAIL_DELIVERY_MODE ?? 'console',
   allowDisabledEmailInProduction:
     process.env.ALLOW_DISABLED_EMAIL_IN_PRODUCTION === 'true',
+  prelaunch: {
+    enabled: process.env.ALLOW_PRELAUNCH_TEST_MODE === 'true',
+    emails: (process.env.PRELAUNCH_TEST_EMAILS ?? '')
+      .split(',')
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+    streamSimulation:
+      process.env.ALLOW_PRELAUNCH_STREAM_SIMULATION === 'true',
+  },
   streaming: {
     provider: process.env.STREAMING_PROVIDER ?? 'mock',
     statusSyncSeconds: Number(process.env.STREAM_STATUS_SYNC_SECONDS ?? 10),

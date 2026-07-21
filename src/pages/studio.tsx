@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity,
@@ -13,6 +13,7 @@ import {
 import { useAuth } from "../auth";
 import { useCreator } from "../creator";
 import { authApi } from "../api/auth";
+import { streamsApi } from "../api/streams";
 import { PageTitle } from "./discovery";
 
 const nav = [
@@ -27,6 +28,14 @@ const nav = [
 export function DashboardPage() {
   const { user } = useAuth();
   const { creator, channel, isLoadingCreator } = useCreator();
+  const [prelaunchTestMode, setPrelaunchTestMode] = useState(false);
+  useEffect(() => {
+    if (creator && channel) {
+      streamsApi.configuration()
+        .then(({ streaming }) => setPrelaunchTestMode(streaming.prelaunchTestMode))
+        .catch(() => setPrelaunchTestMode(false));
+    }
+  }, [creator, channel]);
   if (isLoadingCreator) return <div className="auth-loading">Loading your creator account…</div>;
   if (!creator || !channel) return <CreatorOnboarding />;
   return (
@@ -56,7 +65,7 @@ export function DashboardPage() {
         <ZeroStat label="Earnings" icon={CircleDollarSign} unavailable />
       </div>
       <div className="dashboard-grid">
-        <section className="panel dashboard-zero"><Radio /><h2>Streaming foundation ready</h2><p>Prepare a real stream record, then use the development mock provider to test the provider-confirmed lifecycle. Mock mode does not deliver video.</p><Link className="btn btn-accent" to="/go-live">Open Creator Studio</Link></section>
+        <section className="panel dashboard-zero"><Radio />{prelaunchTestMode && <div className="test-mode-inline"><b>TEST MODE — No real video is being broadcast.</b></div>}<h2>Streaming foundation ready</h2><p>Prepare a real stream record, then use the mock provider to test the provider-confirmed lifecycle. Mock mode does not deliver video.</p><Link className="btn btn-accent" to="/go-live">Open Creator Studio</Link></section>
         <section className="panel dashboard-zero"><Users /><h2>Build your first audience</h2><p>Share your public channel URL. Followers and community activity will start from zero.</p><button className="btn btn-muted" onClick={() => navigator.clipboard?.writeText(`${location.origin}/channel/${channel.slug}`)}>Copy channel link</button></section>
       </div>
     </div>
@@ -64,7 +73,7 @@ export function DashboardPage() {
 }
 
 function CreatorOnboarding() {
-  const { user } = useAuth();
+  const { user, capabilities, activatePrelaunch } = useAuth();
   const { createCreator } = useCreator();
   const [form, setForm] = useState({ name: "", slug: "", description: "" });
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [resent, setResent] = useState(false);
@@ -89,6 +98,14 @@ function CreatorOnboarding() {
       setError(reason instanceof Error ? reason.message : "Email delivery is temporarily unavailable. Please try again later.");
     }
   }
+  async function activateTestAccess() {
+    setBusy(true); setError("");
+    try {
+      await activatePrelaunch();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Prelaunch activation is unavailable");
+    } finally { setBusy(false); }
+  }
   return (
     <div className="page creator-onboarding-page">
       <StudioNav />
@@ -101,7 +118,7 @@ function CreatorOnboarding() {
             <div className="met"><Check /> Account created</div>
             <div className={user?.emailVerified ? "met" : "required"}>{user?.emailVerified ? <Check /> : <span>!</span>} {user?.emailVerified ? "Email verified" : "Email verification required"}</div>
           </div>
-          {!user?.emailVerified && <div className="verification-callout"><div><b>Verify your email before creating a creator channel.</b><p>Email verification may be temporarily unavailable. When delivery is enabled, use the verification link sent to {user?.email}.</p></div><button className="btn btn-muted" onClick={resend} disabled={resent}>{resent ? "Verification sent" : "Resend verification"}</button></div>}
+          {!user?.emailVerified && <div className="verification-callout"><div><b>Verify your email before creating a creator channel.</b><p>{capabilities.prelaunchActivationAvailable ? "This account is approved for free prelaunch creator testing." : `Email verification may be temporarily unavailable. When delivery is enabled, use the verification link sent to ${user?.email}.`}</p></div>{capabilities.prelaunchActivationAvailable ? <button className="btn btn-accent" onClick={activateTestAccess} disabled={busy}>Activate Prelaunch Test Access</button> : <button className="btn btn-muted" onClick={resend} disabled={resent}>{resent ? "Verification sent" : "Resend verification"}</button>}</div>}
         </section>
         <form className="creator-onboarding-form" onSubmit={submit}>
           <h2>Create your channel</h2>
