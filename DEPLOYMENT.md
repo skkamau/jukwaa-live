@@ -94,11 +94,10 @@ Use these Vercel project settings:
 Add only these production build variables:
 
 ```dotenv
-VITE_API_BASE_URL=https://<api-service>.onrender.com/api/v1
-VITE_DEMO_CONTENT_ENABLED=false
+VITE_API_BASE_URL=/api/v1
 ```
 
-Redeploy after changing a Vite variable because it is compiled into the frontend bundle. `vercel.json` rewrites non-API routes to `index.html`, so direct visits and refreshes work for `/login`, `/register`, `/dashboard`, `/channel/:slug`, `/watch/:id`, `/go-live`, and `/settings`. The frontend does not proxy `/api`; it calls the configured Render API directly.
+Redeploy after changing a Vite variable because it is compiled into the frontend bundle. `vercel.json` proxies `/api/*` to the Render service so authentication cookies remain first-party in browsers that block cross-site cookies, including mobile Safari. It separately rewrites non-API routes to `index.html`, so direct visits and refreshes work for `/login`, `/register`, `/dashboard`, `/channel/:slug`, `/watch/:id`, `/go-live`, and `/settings`.
 
 ## E. Verify production
 
@@ -109,7 +108,7 @@ Redeploy after changing a Vite variable because it is compiled into the frontend
 5. Verify the account, sign out, sign back in, and refresh a protected route.
 6. Test forgot-password and password-reset email delivery.
 7. Create a creator/channel and refresh to confirm persistence.
-8. Prepare a stream. In production, development simulation controls must not appear, simulation endpoints must return 403, and no playback URL or fake video appears.
+8. Prepare a stream. During explicit prelaunch test mode, confirm the labelled mock simulation controls appear and no real video or provider credentials are exposed.
 9. Directly refresh every important React route.
 10. Turn off the development laptop and test the site from another device/network.
 
@@ -123,7 +122,7 @@ FRONTEND_ORIGIN=https://jukwaa.live
 AUTH_COOKIE_SAME_SITE=lax
 
 # Vercel
-VITE_API_BASE_URL=https://api.jukwaa.live/api/v1
+VITE_API_BASE_URL=/api/v1
 ```
 
 Update DNS, redeploy both services, and repeat authentication tests. The host-only API cookie remains Secure and HttpOnly.
