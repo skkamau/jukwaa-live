@@ -20,6 +20,8 @@ export default registerAs(APP_CONFIG_KEY, () => ({
     process.env.ALLOW_DISABLED_EMAIL_IN_PRODUCTION === 'true',
   prelaunch: {
     enabled: process.env.ALLOW_PRELAUNCH_TEST_MODE === 'true',
+    allAccounts:
+      process.env.ALLOW_ALL_PRELAUNCH_TEST_ACCOUNTS === 'true',
     emails: (process.env.PRELAUNCH_TEST_EMAILS ?? '')
       .split(',')
       .map((email) => email.trim().toLowerCase())

@@ -73,6 +73,7 @@ TRUST_PROXY=false
 SESSION_TTL_DAYS=30
 EMAIL_DELIVERY_MODE=console
 ALLOW_PRELAUNCH_TEST_MODE=false
+ALLOW_ALL_PRELAUNCH_TEST_ACCOUNTS=false
 PRELAUNCH_TEST_EMAILS=
 ALLOW_PRELAUNCH_STREAM_SIMULATION=false
 MAIL_FROM=Jukwaa Live <no-reply@jukwaa.live>
@@ -85,7 +86,7 @@ Public cross-site deployments configure `AUTH_COOKIE_SAME_SITE=none`; production
 
 Only `mock` is accepted in Stage 5A. Production requires explicit mock opt-in. Stream simulation remains denied by default; the only production exception requires disabled email delivery, explicit prelaunch and simulation flags, an authenticated owner whose exact normalized email is allowlisted, and active creator/channel records. Public responses omit provider stream IDs, credentials, creator emails, sessions, token data, and infrastructure secrets.
 
-`POST /api/v1/auth/prelaunch/activate` is an authenticated, idempotent self-activation endpoint. It can update only the signed-in account and only when its exact email is in `PRELAUNCH_TEST_EMAILS`. Wildcards are rejected during startup validation. Prelaunch verification is separately recorded in `prelaunch_verified_at`.
+`POST /api/v1/auth/prelaunch/activate` is an authenticated, idempotent self-activation endpoint. It can update only the signed-in account. Eligibility normally requires an exact email in `PRELAUNCH_TEST_EMAILS`; the explicit `ALLOW_ALL_PRELAUNCH_TEST_ACCOUNTS=true` switch temporarily makes every account eligible while prelaunch mode is enabled. Wildcards remain rejected during startup validation. Prelaunch verification is separately recorded in `prelaunch_verified_at`.
 
 For SMTP, set `EMAIL_DELIVERY_MODE=smtp` plus `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, and `MAIL_FROM`. Console delivery prints development-only verification/reset URLs and is rejected at startup in production.
 

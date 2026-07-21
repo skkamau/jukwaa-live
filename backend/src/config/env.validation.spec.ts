@@ -146,6 +146,15 @@ describe('validateEnvironment', () => {
     })).toThrow('prelaunch stream simulation requires ALLOW_PRELAUNCH_TEST_MODE=true');
   });
 
+  it('requires prelaunch mode before enabling all-account access', () => {
+    expect(() => validateEnvironment({
+      NODE_ENV: 'test',
+      FRONTEND_ORIGIN: 'http://localhost:5173',
+      DATABASE_URL: 'postgresql://test:test@localhost:5432/jukwaa_test',
+      ALLOW_ALL_PRELAUNCH_TEST_ACCOUNTS: true,
+    })).toThrow('all-account prelaunch access requires ALLOW_PRELAUNCH_TEST_MODE=true');
+  });
+
   it('requires disabled email delivery for production prelaunch mode', () => {
     expect(() => validateEnvironment({
       NODE_ENV: 'production',

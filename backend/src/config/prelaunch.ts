@@ -4,7 +4,10 @@ export function isPrelaunchTestEmail(config: ConfigService, email: string): bool
   return (
     config.get<boolean>('app.prelaunch.enabled', false) &&
     config.get<string>('app.mailMode') === 'disabled' &&
-    config.get<string[]>('app.prelaunch.emails', []).includes(email.trim().toLowerCase())
+    (
+      config.get<boolean>('app.prelaunch.allAccounts', false) ||
+      config.get<string[]>('app.prelaunch.emails', []).includes(email.trim().toLowerCase())
+    )
   );
 }
 

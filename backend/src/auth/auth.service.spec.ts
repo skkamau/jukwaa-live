@@ -25,6 +25,7 @@ describe('AuthService', () => {
   const mail = { isDeliveryAvailable: true, sendVerification: jest.fn(), sendPasswordReset: jest.fn() };
   const configValues: Record<string, unknown> = {
     'app.prelaunch.enabled': false,
+    'app.prelaunch.allAccounts': false,
     'app.prelaunch.emails': [],
     'app.mailMode': 'console',
   };
@@ -42,6 +43,7 @@ describe('AuthService', () => {
     jest.clearAllMocks();
     mail.isDeliveryAvailable = true;
     configValues['app.prelaunch.enabled'] = false;
+    configValues['app.prelaunch.allAccounts'] = false;
     configValues['app.prelaunch.emails'] = [];
     configValues['app.mailMode'] = 'console';
     passwords.hash.mockResolvedValue('argon-hash');
@@ -106,6 +108,29 @@ describe('AuthService', () => {
       }),
     }));
     expect(prisma.emailVerificationToken.create).not.toHaveBeenCalled();
+  });
+
+  it('records prelaunch verification for any registration only when the explicit all-account switch is enabled', async () => {
+    mail.isDeliveryAvailable = false;
+    configValues['app.prelaunch.enabled'] = true;
+    configValues['app.prelaunch.allAccounts'] = true;
+    configValues['app.mailMode'] = 'disabled';
+    prisma.user.create.mockResolvedValue({ ...user, emailVerifiedAt: new Date() });
+
+    const result = await service.register({
+      email: user.email,
+      username: user.username,
+      displayName: user.displayName,
+      password: 'long password value',
+    });
+
+    expect(result.user.emailVerified).toBe(true);
+    expect(prisma.user.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        emailVerifiedAt: expect.any(Date),
+        prelaunchVerifiedAt: expect.any(Date),
+      }),
+    }));
   });
 
   it('allows an allowlisted authenticated user to activate only their own account', async () => {

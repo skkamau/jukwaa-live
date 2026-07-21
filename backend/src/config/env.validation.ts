@@ -13,6 +13,7 @@ export interface EnvironmentVariables extends Record<string, unknown> {
   EMAIL_DELIVERY_MODE: 'console' | 'smtp' | 'disabled';
   ALLOW_DISABLED_EMAIL_IN_PRODUCTION: boolean;
   ALLOW_PRELAUNCH_TEST_MODE: boolean;
+  ALLOW_ALL_PRELAUNCH_TEST_ACCOUNTS: boolean;
   PRELAUNCH_TEST_EMAILS: string;
   ALLOW_PRELAUNCH_STREAM_SIMULATION: boolean;
   STREAMING_PROVIDER: 'mock';
@@ -38,6 +39,7 @@ const environmentSchema = Joi.object<EnvironmentVariables>({
   EMAIL_DELIVERY_MODE: Joi.string().valid('console', 'smtp', 'disabled').default('console'),
   ALLOW_DISABLED_EMAIL_IN_PRODUCTION: Joi.boolean().default(false),
   ALLOW_PRELAUNCH_TEST_MODE: Joi.boolean().default(false),
+  ALLOW_ALL_PRELAUNCH_TEST_ACCOUNTS: Joi.boolean().default(false),
   PRELAUNCH_TEST_EMAILS: Joi.string().allow('').default('').custom((raw: string, helpers) => {
     const emails = raw.split(',').map((email) => email.trim().toLowerCase()).filter(Boolean);
     const emailSchema = Joi.string().email({ tlds: { allow: false } });
@@ -83,6 +85,12 @@ export function validateEnvironment(
   if (value.ALLOW_PRELAUNCH_STREAM_SIMULATION && !value.ALLOW_PRELAUNCH_TEST_MODE) {
     throw new Error(
       'Environment validation failed: prelaunch stream simulation requires ALLOW_PRELAUNCH_TEST_MODE=true',
+    );
+  }
+
+  if (value.ALLOW_ALL_PRELAUNCH_TEST_ACCOUNTS && !value.ALLOW_PRELAUNCH_TEST_MODE) {
+    throw new Error(
+      'Environment validation failed: all-account prelaunch access requires ALLOW_PRELAUNCH_TEST_MODE=true',
     );
   }
 
